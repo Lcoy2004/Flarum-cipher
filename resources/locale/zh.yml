@@ -42,6 +42,7 @@ lcoy-cipher:
     condition_follow_discussion: 需要先关注本帖
     condition_minlikes: 帖子赞数达到
     condition_time: 指定时间后可见
+    time_picker_placeholder: 点击选择时间
     quick_time_placeholder: 快捷时间…
     quick_time_1h: 1 小时后
     quick_time_6h: 6 小时后

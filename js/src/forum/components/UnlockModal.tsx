@@ -85,8 +85,8 @@ export default class UnlockModal extends FormModal<IUnlockModalAttrs> {
           />
         </div>
         {this.error && <div className="CipherUnlockModal-error">{this.error}</div>}
-        <div className="Form-group">
-          <Button className="Button Button--primary Button--block" type="submit" loading={this.loading}>
+        <div className="CipherUnlockModal-submit">
+          <Button className="Button Button--primary" type="submit" loading={this.loading}>
             {app.translator.trans('lcoy-cipher.forum.submit')}
           </Button>
         </div>

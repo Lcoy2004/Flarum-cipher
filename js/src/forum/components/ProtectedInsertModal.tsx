@@ -126,7 +126,21 @@ export default class ProtectedInsertModal extends FormModal<IProtectedInsertModa
 
           <div className="Cipher-insert-row Cipher-insert-row--time">
             <label className="Cipher-insert-row-label">{app.translator.trans('lcoy-cipher.forum.condition_time')}</label>
-            <input className="FormControl" type="datetime-local" bidi={this.time} />
+            <div
+              className="Cipher-time-trigger"
+              title={String(app.translator.trans('lcoy-cipher.forum.time_picker_placeholder'))}
+            >
+              <i className="fas fa-clock Cipher-time-icon" aria-hidden="true"></i>
+              <span className={`Cipher-time-value${this.time() ? '' : ' is-empty'}`}>
+                {this.time()
+                  ? ProtectedInsertModal.formatShortTime(this.time())
+                  : app.translator.trans('lcoy-cipher.forum.time_picker_placeholder')}
+              </span>
+              {/* Transparent overlay: clicking anywhere on the trigger opens the
+                  native datetime picker, so the full YYYY-MM-DDTHH:mm value never
+                  has to fit inside a narrow input. */}
+              <input className="Cipher-time-input" type="datetime-local" bidi={this.time} />
+            </div>
             <Select
               className="Cipher-insert-quicktime"
               options={this.quickTimeOptions()}
@@ -275,6 +289,16 @@ export default class ProtectedInsertModal extends FormModal<IProtectedInsertModa
     const timestamp = new Date(trimmed).getTime();
 
     return Number.isNaN(timestamp) ? null : Math.floor(timestamp / 1000);
+  }
+
+  /**
+   * Compress a datetime-local value ("2026-08-09T12:00") into a short label
+   * ("08-09 12:00") that fits the trigger row without truncation.
+   */
+  static formatShortTime(time: string): string {
+    const m = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})/.exec(time.trim());
+
+    return m ? `${m[2]}-${m[3]} ${m[4]}:${m[5]}` : time;
   }
 
   /**

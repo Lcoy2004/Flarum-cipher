@@ -123,6 +123,18 @@
   color: var(--danger-color);
 }
 
+// Submit button: centered with a comfortable width instead of the full-width
+// block style, so it doesn't dominate the small modal.
+.CipherUnlockModal-submit {
+  display: flex;
+  justify-content: center;
+  margin-top: 0.75rem;
+
+  .Button {
+    min-width: 10rem;
+  }
+}
+
 .CipherUnlockModal-reqs {
   display: flex;
   flex-direction: column;
@@ -286,6 +298,58 @@
 
     .Select {
       min-width: 0;
+    }
+  }
+
+  // Time picker trigger: a compact clickable chip (clock icon + short label)
+  // with an invisible datetime-local input stretched over it. Clicking
+  // anywhere on the chip opens the native picker, so the full
+  // "YYYY-MM-DDTHH:mm" value never has to fit inside a narrow input box.
+  .Cipher-time-trigger {
+    position: relative;
+    display: flex;
+    align-items: center;
+    gap: 0.45rem;
+    min-width: 0;
+    padding: 0.3rem 0.5rem;
+    border: 1px solid var(--control-bg);
+    border-radius: var(--border-radius);
+    background: var(--body-bg);
+    color: var(--muted-color);
+    cursor: pointer;
+    transition: border-color 0.15s;
+
+    &:hover {
+      border-color: var(--primary-color);
+    }
+
+    .Cipher-time-icon {
+      flex: none;
+      font-size: 0.9rem;
+      color: var(--primary-color);
+    }
+
+    .Cipher-time-value {
+      font-size: 0.82rem;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+
+      &.is-empty {
+        color: var(--muted-more-color);
+      }
+    }
+
+    .Cipher-time-input {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      padding: 0;
+      border: none;
+      background: transparent;
+      opacity: 0;
+      cursor: pointer;
     }
   }
 }
