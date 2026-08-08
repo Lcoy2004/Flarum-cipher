@@ -63,10 +63,6 @@ export default class ProtectedInsertModal extends FormModal<IProtectedInsertModa
   protected followDiscussion = Stream(false);
   protected minlikes = Stream('');
   protected time = Stream('');
-  // Whether the datetime-local input is expanded (after the clock chip was
-  // clicked). The chip keeps the row compact; the input opens wide enough to
-  // pick a value and collapses on blur.
-  protected timeOpen = false;
 
   // Parsed inner content of the tag being edited (kept untouched). Named to
   // avoid shadowing the Modal base class's `inner()` method.
@@ -138,34 +134,7 @@ export default class ProtectedInsertModal extends FormModal<IProtectedInsertModa
             />
           </div>
           <div className="Cipher-insert-row Cipher-insert-row--time-field">
-            {this.timeOpen ? (
-              <input
-                className="FormControl Cipher-time-input"
-                type="datetime-local"
-                bidi={this.time}
-                onblur={() => {
-                  this.timeOpen = false;
-                  m.redraw();
-                }}
-              />
-            ) : (
-              <button
-                type="button"
-                className="Cipher-time-trigger"
-                title={String(app.translator.trans('lcoy-cipher.forum.time_picker_placeholder'))}
-                onclick={() => {
-                  this.timeOpen = true;
-                  m.redraw();
-                }}
-              >
-                <i className="fas fa-clock Cipher-time-icon" aria-hidden="true"></i>
-                <span className={`Cipher-time-value${this.time() ? '' : ' is-empty'}`}>
-                  {this.time()
-                    ? ProtectedInsertModal.formatShortTime(this.time())
-                    : app.translator.trans('lcoy-cipher.forum.time_picker_placeholder')}
-                </span>
-              </button>
-            )}
+            <input className="FormControl Cipher-time-input" type="datetime-local" bidi={this.time} />
           </div>
         </div>
 
@@ -308,16 +277,6 @@ export default class ProtectedInsertModal extends FormModal<IProtectedInsertModa
     const timestamp = new Date(trimmed).getTime();
 
     return Number.isNaN(timestamp) ? null : Math.floor(timestamp / 1000);
-  }
-
-  /**
-   * Compress a datetime-local value ("2026-08-09T12:00") into a short label
-   * ("08-09 12:00") that fits the trigger row without truncation.
-   */
-  static formatShortTime(time: string): string {
-    const m = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})/.exec(time.trim());
-
-    return m ? `${m[2]}-${m[3]} ${m[4]}:${m[5]}` : time;
   }
 
   /**

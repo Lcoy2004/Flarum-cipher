@@ -42,7 +42,6 @@ lcoy-cipher:
     condition_follow_discussion: Must follow this discussion
     condition_minlikes: Post needs this many likes
     condition_time: Visible after a scheduled time
-    time_picker_placeholder: Click to pick a time
     quick_time_placeholder: Quick time…
     quick_time_1h: In 1 hour
     quick_time_6h: In 6 hours
