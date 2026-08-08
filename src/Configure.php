@@ -18,7 +18,7 @@ class Configure
     public function __invoke(Configurator $config): void
     {
         $config->BBCodes->addCustom(
-            '[protected password={TEXT?} title={TEXT?} id={TEXT?} like={TEXT?} reply={TEXT?} follow={TEXT?} minlikes={TEXT?} time={TEXT?}]{TEXT}[/protected]',
+            '[protected password={TEXT?} title={TEXT?} id={TEXT?} like={TEXT?} reply={TEXT?} follow={TEXT?} followDiscussion={TEXT?} minlikes={TEXT?} time={TEXT?}]{TEXT}[/protected]',
             $this->template()
         );
 
@@ -75,6 +75,12 @@ class Configure
 				<xsl:if test="@data-cipher-req-follow">
 					<xsl:attribute name="data-cipher-req-follow"><xsl:value-of select="@data-cipher-req-follow"/></xsl:attribute>
 				</xsl:if>
+				<xsl:if test="@data-cipher-msg-followDiscussion">
+					<xsl:attribute name="data-cipher-msg-followDiscussion"><xsl:value-of select="@data-cipher-msg-followDiscussion"/></xsl:attribute>
+				</xsl:if>
+				<xsl:if test="@data-cipher-req-followDiscussion">
+					<xsl:attribute name="data-cipher-req-followDiscussion"><xsl:value-of select="@data-cipher-req-followDiscussion"/></xsl:attribute>
+				</xsl:if>
 				<xsl:if test="@data-cipher-msg-minlikes">
 					<xsl:attribute name="data-cipher-msg-minlikes"><xsl:value-of select="@data-cipher-msg-minlikes"/></xsl:attribute>
 				</xsl:if>
@@ -101,6 +107,9 @@ class Configure
 				</xsl:if>
 				<xsl:if test="@data-cipher-msg-follow">
 					<div class="Cipher-box-req Cipher-box-req--follow"><xsl:choose><xsl:when test="@data-cipher-req-follow=\'1\'"><i class="fas fa-check Cipher-req-icon Cipher-req-icon--met" aria-hidden="true"></i></xsl:when><xsl:otherwise><i class="fas fa-times Cipher-req-icon Cipher-req-icon--unmet" aria-hidden="true"></i></xsl:otherwise></xsl:choose><span><xsl:value-of select="@data-cipher-msg-follow"/></span></div>
+				</xsl:if>
+				<xsl:if test="@data-cipher-msg-followDiscussion">
+					<div class="Cipher-box-req Cipher-box-req--followDiscussion"><xsl:choose><xsl:when test="@data-cipher-req-followDiscussion=\'1\'"><i class="fas fa-check Cipher-req-icon Cipher-req-icon--met" aria-hidden="true"></i></xsl:when><xsl:otherwise><i class="fas fa-times Cipher-req-icon Cipher-req-icon--unmet" aria-hidden="true"></i></xsl:otherwise></xsl:choose><span><xsl:value-of select="@data-cipher-msg-followDiscussion"/></span></div>
 				</xsl:if>
 				<xsl:if test="@data-cipher-msg-minlikes">
 					<div class="Cipher-box-req Cipher-box-req--minlikes"><xsl:choose><xsl:when test="@data-cipher-req-minlikes=\'1\'"><i class="fas fa-check Cipher-req-icon Cipher-req-icon--met" aria-hidden="true"></i></xsl:when><xsl:otherwise><i class="fas fa-times Cipher-req-icon Cipher-req-icon--unmet" aria-hidden="true"></i></xsl:otherwise></xsl:choose><span><xsl:value-of select="@data-cipher-msg-minlikes"/></span></div>

@@ -7,11 +7,12 @@ import type ItemList from 'flarum/common/utils/ItemList';
 export { default as extend } from './extend';
 
 import UnlockModal from './components/UnlockModal';
+import ProtectedInsertModal from './components/ProtectedInsertModal';
 import { attemptAutoUnlock } from './utils/autoUnlock';
 import { getPostId } from './utils/unlock';
 import { setupRealtimeUpdates, setupTimeUnlocks } from './utils/realtime';
 
-const REQUIREMENT_KEYS = ['time', 'like', 'reply', 'follow', 'minlikes'] as const;
+const REQUIREMENT_KEYS = ['time', 'like', 'reply', 'follow', 'followDiscussion', 'minlikes'] as const;
 
 export interface CipherRequirement {
   key: string;
@@ -35,7 +36,7 @@ function boxRequirements(box: HTMLElement): CipherRequirement[] {
     if (!message) return null;
 
     return { key, met: met === '1', message };
-  }).filter((requirement): requirement is CipherRequirement => Boolean(requirement));
+  }).filter(Boolean) as CipherRequirement[];
 }
 
 app.initializers.add('lcoy-cipher', () => {
@@ -60,8 +61,9 @@ app.initializers.add('lcoy-cipher', () => {
     }
   });
 
-  // Composer toolbar button that inserts the [protected] BBCode, prompting for
-  // a password and optional visibility conditions.
+  // Composer toolbar button that opens a visual editor for the [protected]
+  // BBCode — password, title and visibility conditions. If the selection
+  // contains an existing tag it is pre-filled for editing.
   extend(TextEditor.prototype, 'toolbarItems', function (this: TextEditor, items: ItemList) {
     items.add(
       'cipher',
@@ -70,37 +72,34 @@ app.initializers.add('lcoy-cipher', () => {
         icon="fas fa-lock"
         title={String(app.translator.trans('lcoy-cipher.forum.insert_protected'))}
         onclick={() => {
-          const editor = this.attrs.composer.editor;
+          const editor = this.attrs.composer?.editor;
+
+          // The composer may not be attached yet (e.g. quick reply collapsed).
+          if (!editor) return;
+
           const [start, end] = editor.getSelectionRange();
-          const selected =
-            editor.el.value.slice(start, end) || String(app.translator.trans('lcoy-cipher.forum.placeholder_content'));
+          const selected = editor.el.value.slice(start, end);
 
-          const password =
-            window.prompt(String(app.translator.trans('lcoy-cipher.forum.insert_password_prompt')), '') || '';
-          const options =
-            window.prompt(String(app.translator.trans('lcoy-cipher.forum.insert_options_prompt')), '') || '';
+          // If the selection already wraps a [protected] block, edit it in
+          // place; otherwise wrap the selection (or the placeholder text).
+          const existing = ProtectedInsertModal.parseTag(selected)?.source || null;
 
-          const attrs: string[] = [`password="${password}"`];
+          const placeholder = String(app.translator.trans('lcoy-cipher.forum.placeholder_content'));
 
-          options.split(/[,，]/).forEach((raw) => {
-            const option = raw.trim();
-
-            if (!option) return;
-
-            const eq = option.indexOf('=');
-
-            if (eq > -1) {
-              attrs.push(`${option.slice(0, eq).trim()}="${option.slice(eq + 1).trim()}"`);
+          const insert = (bbcode: string) => {
+            if (existing) {
+              // Replace the whole existing tag, keeping its position.
+              editor.insertBetween(start, end, bbcode, true);
+              editor.moveCursorTo(start + bbcode.length - '[/protected]'.length);
             } else {
-              attrs.push(`${option}="1"`);
+              const content = selected || placeholder;
+              const template = `${bbcode.slice(0, bbcode.length - '[/protected]'.length)}${content}[/protected]`;
+              editor.insertBetween(start, end, template, false);
+              editor.moveCursorTo(start + bbcode.slice(0, bbcode.length - '[/protected]'.length).length);
             }
-          });
+          };
 
-          const prefix = `[protected ${attrs.join(' ')}]`;
-          const template = `${prefix}${selected}[/protected]`;
-
-          editor.insertBetween(start, end, template, false);
-          editor.moveCursorTo(start + prefix.length);
+          app.modal.show(ProtectedInsertModal, { existing, onSubmit: insert });
         }}
       />,
       10

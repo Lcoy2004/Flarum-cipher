@@ -116,6 +116,21 @@ class Conditions
     }
 
     /**
+     * @return bool whether the actor follows the post's discussion
+     *
+     * Requires the flarum-subscriptions extension, which stores the state in
+     * discussion_user.subscription ('follow' | 'ignore').
+     */
+    public function hasFollowedDiscussion(Post $post, User $actor): bool
+    {
+        return $this->db->table('discussion_user')
+            ->where('user_id', $actor->id)
+            ->where('discussion_id', $post->discussion_id)
+            ->where('subscription', 'follow')
+            ->exists();
+    }
+
+    /**
      * @return int total number of likes on the post
      */
     public function likeCount(Post $post): int
@@ -127,7 +142,7 @@ class Conditions
      * The list of condition keys currently not satisfied for this actor.
      *
      * @param  array<string,string> $attrs
-     * @return string[] e.g. ['time', 'like', 'reply', 'follow', 'minlikes']
+     * @return string[] e.g. ['time', 'like', 'reply', 'follow', 'followDiscussion', 'minlikes']
      */
     public function unmet(array $attrs, Post $post, User $actor): array
     {
@@ -147,6 +162,12 @@ class Conditions
 
         if (($attrs['follow'] ?? '') && ! $this->followsAuthor($post, $actor)) {
             $unmet[] = 'follow';
+        }
+
+        // s9e lowercases attribute names, so read the discussion-follow flag
+        // with its lowercase key.
+        if (($attrs['followdiscussion'] ?? '') && ! $this->hasFollowedDiscussion($post, $actor)) {
+            $unmet[] = 'followDiscussion';
         }
 
         $minlikes = (int) ($attrs['minlikes'] ?? 0);

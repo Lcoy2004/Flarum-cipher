@@ -159,7 +159,9 @@ class UnlockController implements RequestHandlerInterface
 
         $block = ['hash' => $hash, 'inner' => $inner];
 
-        foreach (['like', 'reply', 'follow', 'minlikes', 'time'] as $key) {
+        // s9e lowercases attribute names, so read every attribute with its
+        // lowercase key.
+        foreach (['like', 'reply', 'follow', 'followdiscussion', 'minlikes', 'time'] as $key) {
             $block[$key] = $node->hasAttribute($key) ? $node->getAttribute($key) : '';
         }
 
@@ -173,6 +175,7 @@ class UnlockController implements RequestHandlerInterface
             'like' => $this->translator->trans('lcoy-cipher.forum.unlock_like'),
             'reply' => $this->translator->trans('lcoy-cipher.forum.unlock_reply'),
             'follow' => $this->translator->trans('lcoy-cipher.forum.unlock_follow'),
+            'followDiscussion' => $this->translator->trans('lcoy-cipher.forum.unlock_follow_discussion'),
             'minlikes' => $this->translator->trans('lcoy-cipher.forum.unlock_minlikes', [
                 'count' => (int) ($block['minlikes'] ?? 0),
             ]),

@@ -59,6 +59,11 @@ class RequirementStatus
             }
         }
 
+        // s9e lowercases attribute names; keep the display key camel-cased.
+        if (! empty($attrs['followdiscussion'])) {
+            $configured[] = 'followDiscussion';
+        }
+
         if ((int) ($attrs['minlikes'] ?? 0) > 0) {
             $configured[] = 'minlikes';
         }
@@ -91,6 +96,7 @@ class RequirementStatus
             'like' => $this->translator->trans('lcoy-cipher.forum.need_like'),
             'reply' => $this->translator->trans('lcoy-cipher.forum.need_reply'),
             'follow' => $this->translator->trans('lcoy-cipher.forum.need_follow'),
+            'followDiscussion' => $this->translator->trans('lcoy-cipher.forum.need_follow_discussion'),
             'minlikes' => $this->translator->trans('lcoy-cipher.forum.need_minlikes', [
                 'count' => (int) ($attrs['minlikes'] ?? 0),
             ]),
@@ -110,6 +116,7 @@ class RequirementStatus
             'like' => $this->translator->trans('lcoy-cipher.forum.met_like'),
             'reply' => $this->translator->trans('lcoy-cipher.forum.met_reply'),
             'follow' => $this->translator->trans('lcoy-cipher.forum.met_follow'),
+            'followDiscussion' => $this->translator->trans('lcoy-cipher.forum.met_follow_discussion'),
             'minlikes' => $this->translator->trans('lcoy-cipher.forum.met_minlikes', [
                 'count' => (int) ($attrs['minlikes'] ?? 0),
             ]),
