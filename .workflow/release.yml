@@ -1,23 +1,23 @@
 version: '1.0'
-name: 自动发布Release
-displayName: 自动发布Release                    # ← 必填，显示在流水线列表的名称
+name: auto-release
+displayName: 自动发布Release          # 必填，显示在流水线列表
 
 triggers:
   push:
     tags:
-      - 'v*'                                  # 只匹配以 v 开头的 Tag
+      - 'v*'                         # 匹配以 v 开头的 Tag
 
 stages:
-  - name: 构建与发布
-    displayName: 构建与发布阶段                # 阶段名称（非强制但建议）
-    jobs:
-      - name: create-release
-        displayName: 创建Release任务           # 任务显示名（非强制）
-        steps:
+  - name: release-stage
+    displayName: 发布阶段
+    jobs:                            # ← 必须包含 jobs 数组
+      - name: create-release-job
+        displayName: 创建Release任务
+        steps:                       # ← steps 属于 job，缩进正确
           - name: 拉取代码
             uses: checkout@1.0
 
-          # （可选）在此插入你的构建步骤，例如：
+          # （可选）在此插入构建步骤，例如：
           # - name: 编译打包
           #   run: |
           #     npm install
@@ -32,6 +32,6 @@ stages:
               body: |
                 本次自动发布基于 Tag: ${{ gitee.ref_name }}
                 请查看 Release 页面获取更新内容。
-              # files:                         # 如需上传附件，取消注释
+              # files:               # 如需上传附件，取消注释并指定路径
               #   - ./dist.zip
               #   - ./README.md
