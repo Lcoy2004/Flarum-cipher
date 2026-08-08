@@ -310,4 +310,26 @@
       min-width: 0;
     }
   }
+
+  // Phone: the modal is close to full-screen, so keep the condition chips in
+  // two columns but stack every label/field row — a fixed 7rem label column
+  // would squeeze the controls on a narrow screen.
+  @media (max-width: 767px) {
+    .Cipher-insert-conditions {
+      gap: 0.4rem;
+
+      .Checkbox {
+        padding: 0.45rem 0.35rem;
+
+        .Checkbox-display {
+          font-size: 0.78rem;
+        }
+      }
+    }
+
+    .Cipher-insert-row {
+      grid-template-columns: 1fr;
+      gap: 0.3rem;
+    }
+  }
 }
