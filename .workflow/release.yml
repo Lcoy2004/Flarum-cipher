@@ -1,21 +1,12 @@
-<<<<<<< HEAD
 actionversion: '1.0'
 name: auto-release
 displayName: 自动发布Release          # 必填，显示在流水线列表
 
-=======
-version: '1.0'
-name: auto-release
-displayName: 自动发布Release          # 必填，显示在流水线列表
->>>>>>> afc8a6c (release: 更新保护块缓存逻辑)
 triggers:
   push:
     tags:
       - 'v*'                         # 匹配以 v 开头的 Tag
-<<<<<<< HEAD
 
-=======
->>>>>>> afc8a6c (release: 更新保护块缓存逻辑)
 stages:
   - name: release-stage
     displayName: 发布阶段
@@ -25,20 +16,14 @@ stages:
         steps:                       # ← steps 属于 job，缩进正确
           - name: 拉取代码
             uses: checkout@1.0
-<<<<<<< HEAD
 
-=======
->>>>>>> afc8a6c (release: 更新保护块缓存逻辑)
           # （可选）在此插入构建步骤，例如：
           # - name: 编译打包
           #   run: |
           #     npm install
           #     npm run build
           #     zip -r dist.zip ./dist
-<<<<<<< HEAD
 
-=======
->>>>>>> afc8a6c (release: 更新保护块缓存逻辑)
           - name: 创建Gitee Release
             uses: gitrelease@1.0
             params:
