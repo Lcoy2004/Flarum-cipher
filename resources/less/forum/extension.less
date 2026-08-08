@@ -301,21 +301,22 @@
     }
   }
 
-  // Time picker trigger: a compact clickable chip (clock icon + short label)
-  // with an invisible datetime-local input stretched over it. Clicking
-  // anywhere on the chip opens the native picker, so the full
-  // "YYYY-MM-DDTHH:mm" value never has to fit inside a narrow input box.
+  // Time picker trigger: a compact clickable chip (clock icon + short label).
+  // Clicking it expands a normal datetime-local input in its place, so the
+  // picker always opens with plenty of room and the compact row never has to
+  // fit the full "YYYY-MM-DDTHH:mm" value.
   .Cipher-time-trigger {
-    position: relative;
     display: flex;
     align-items: center;
     gap: 0.45rem;
     min-width: 0;
-    padding: 0.3rem 0.5rem;
+    padding: 0.35rem 0.6rem;
     border: 1px solid var(--control-bg);
     border-radius: var(--border-radius);
     background: var(--body-bg);
     color: var(--muted-color);
+    font: inherit;
+    text-align: left;
     cursor: pointer;
     transition: border-color 0.15s;
 
@@ -338,18 +339,6 @@
       &.is-empty {
         color: var(--muted-more-color);
       }
-    }
-
-    .Cipher-time-input {
-      position: absolute;
-      inset: 0;
-      width: 100%;
-      height: 100%;
-      padding: 0;
-      border: none;
-      background: transparent;
-      opacity: 0;
-      cursor: pointer;
     }
   }
 }

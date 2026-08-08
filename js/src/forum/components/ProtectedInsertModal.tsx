@@ -63,6 +63,10 @@ export default class ProtectedInsertModal extends FormModal<IProtectedInsertModa
   protected followDiscussion = Stream(false);
   protected minlikes = Stream('');
   protected time = Stream('');
+  // Whether the datetime-local input is expanded (after the clock chip was
+  // clicked). The chip keeps the row compact; the input opens wide enough to
+  // pick a value and collapses on blur.
+  protected timeOpen = false;
 
   // Parsed inner content of the tag being edited (kept untouched). Named to
   // avoid shadowing the Modal base class's `inner()` method.
@@ -126,21 +130,34 @@ export default class ProtectedInsertModal extends FormModal<IProtectedInsertModa
 
           <div className="Cipher-insert-row Cipher-insert-row--time">
             <label className="Cipher-insert-row-label">{app.translator.trans('lcoy-cipher.forum.condition_time')}</label>
-            <div
-              className="Cipher-time-trigger"
-              title={String(app.translator.trans('lcoy-cipher.forum.time_picker_placeholder'))}
-            >
-              <i className="fas fa-clock Cipher-time-icon" aria-hidden="true"></i>
-              <span className={`Cipher-time-value${this.time() ? '' : ' is-empty'}`}>
-                {this.time()
-                  ? ProtectedInsertModal.formatShortTime(this.time())
-                  : app.translator.trans('lcoy-cipher.forum.time_picker_placeholder')}
-              </span>
-              {/* Transparent overlay: clicking anywhere on the trigger opens the
-                  native datetime picker, so the full YYYY-MM-DDTHH:mm value never
-                  has to fit inside a narrow input. */}
-              <input className="Cipher-time-input" type="datetime-local" bidi={this.time} />
-            </div>
+            {this.timeOpen ? (
+              <input
+                className="FormControl Cipher-time-input"
+                type="datetime-local"
+                bidi={this.time}
+                onblur={() => {
+                  this.timeOpen = false;
+                  m.redraw();
+                }}
+              />
+            ) : (
+              <button
+                type="button"
+                className="Cipher-time-trigger"
+                title={String(app.translator.trans('lcoy-cipher.forum.time_picker_placeholder'))}
+                onclick={() => {
+                  this.timeOpen = true;
+                  m.redraw();
+                }}
+              >
+                <i className="fas fa-clock Cipher-time-icon" aria-hidden="true"></i>
+                <span className={`Cipher-time-value${this.time() ? '' : ' is-empty'}`}>
+                  {this.time()
+                    ? ProtectedInsertModal.formatShortTime(this.time())
+                    : app.translator.trans('lcoy-cipher.forum.time_picker_placeholder')}
+                </span>
+              </button>
+            )}
             <Select
               className="Cipher-insert-quicktime"
               options={this.quickTimeOptions()}
