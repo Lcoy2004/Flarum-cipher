@@ -130,6 +130,14 @@ export default class ProtectedInsertModal extends FormModal<IProtectedInsertModa
 
           <div className="Cipher-insert-row Cipher-insert-row--time">
             <label className="Cipher-insert-row-label">{app.translator.trans('lcoy-cipher.forum.condition_time')}</label>
+            <Select
+              className="Cipher-insert-quicktime"
+              options={this.quickTimeOptions()}
+              onchange={(value: string) => value && this.time(String(value))}
+              placeholder={String(app.translator.trans('lcoy-cipher.forum.quick_time_placeholder'))}
+            />
+          </div>
+          <div className="Cipher-insert-row Cipher-insert-row--time-field">
             {this.timeOpen ? (
               <input
                 className="FormControl Cipher-time-input"
@@ -158,12 +166,6 @@ export default class ProtectedInsertModal extends FormModal<IProtectedInsertModa
                 </span>
               </button>
             )}
-            <Select
-              className="Cipher-insert-quicktime"
-              options={this.quickTimeOptions()}
-              onchange={(value: string) => value && this.time(String(value))}
-              placeholder={String(app.translator.trans('lcoy-cipher.forum.quick_time_placeholder'))}
-            />
           </div>
         </div>
 

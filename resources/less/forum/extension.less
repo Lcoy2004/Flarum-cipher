@@ -283,8 +283,18 @@
     width: 100%;
     margin: 0.5rem 0;
 
+    // Time visibility: label + quick-time preset on the first line...
     &--time {
-      grid-template-columns: 7rem 1fr 8rem;
+      grid-template-columns: 7rem 1fr;
+      margin-bottom: 0.25rem;
+    }
+
+    // ...and the picker chip / expanded input on its own full-width line, so
+    // the datetime-local field never shares its width with the label or the
+    // quick-time select (which squeezed it to ~100px in the small modal).
+    &--time-field {
+      grid-template-columns: 1fr;
+      margin-top: 0;
     }
 
     .Cipher-insert-row-label {
@@ -301,16 +311,18 @@
     }
   }
 
-  // Time picker trigger: a compact clickable chip (clock icon + short label).
-  // Clicking it expands a normal datetime-local input in its place, so the
-  // picker always opens with plenty of room and the compact row never has to
-  // fit the full "YYYY-MM-DDTHH:mm" value.
+  // Time picker trigger: a compact clickable chip (clock icon + short label)
+  // filling its row. Clicking it expands a normal datetime-local input in its
+  // place, so the picker always opens with plenty of room and the compact
+  // chip never has to fit the full "YYYY-MM-DDTHH:mm" value.
   .Cipher-time-trigger {
     display: flex;
     align-items: center;
+    justify-content: flex-start;
     gap: 0.45rem;
+    width: 100%;
     min-width: 0;
-    padding: 0.35rem 0.6rem;
+    padding: 0.4rem 0.6rem;
     border: 1px solid var(--control-bg);
     border-radius: var(--border-radius);
     background: var(--body-bg);
@@ -331,7 +343,7 @@
     }
 
     .Cipher-time-value {
-      font-size: 0.82rem;
+      font-size: 0.85rem;
       white-space: nowrap;
       overflow: hidden;
       text-overflow: ellipsis;
