@@ -43,9 +43,8 @@ class ProtectedFilter
 
         $time = $tag->hasAttribute('time') ? $tag->getAttribute('time') : null;
 
-        if (is_string($time) && $time !== '' && preg_match('/^\+?(\d+)\s*(d|h|m|i|s)\b/i', $time, $m)) {
-            $seconds = ['d' => 86400, 'h' => 3600, 'm' => 60, 'i' => 60, 's' => 1][strtolower($m[2])];
-            $tag->setAttribute('time', (string) (time() + (int) $m[1] * $seconds));
+        if (is_string($time) && $time !== '' && ($seconds = Conditions::relativeSeconds($time)) !== null) {
+            $tag->setAttribute('time', (string) (time() + $seconds));
         }
     }
 }

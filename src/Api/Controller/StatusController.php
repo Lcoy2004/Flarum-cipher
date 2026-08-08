@@ -156,6 +156,8 @@ class StatusController implements RequestHandlerInterface
 
             // Scheduled visibility: once the time is reached the content is
             // public, so hand over the rendered HTML to auto-unlock the card.
+            // Nested [protected] blocks inside the fragment are re-gated by the
+            // RenderContent render hook that runs on this Formatter render.
             $target = $this->conditions->timeTarget($attrs);
 
             if ($target !== null && time() >= $target) {

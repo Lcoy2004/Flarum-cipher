@@ -35,6 +35,10 @@ const TAG_RE = /\[protected\b([^\]]*)\]([\s\S]*?)\[\/protected\]/i;
 
 /**
  * Parse the attribute list of a [protected] tag into key/value pairs.
+ *
+ * Keys are normalized to lowercase: BBCode attribute names are
+ * case-insensitive and s9e stores them lowercased, so an author may write
+ * `followDiscussion="1"` or `followdiscussion="1"` — both must match.
  */
 function parseAttrs(attrText: string): Record<string, string> {
   const attrs: Record<string, string> = {};
@@ -43,7 +47,7 @@ function parseAttrs(attrText: string): Record<string, string> {
   let match: RegExpExecArray | null;
 
   while ((match = re.exec(attrText)) !== null) {
-    attrs[match[1]] = match[2] ?? match[3] ?? match[4] ?? '';
+    attrs[match[1].toLowerCase()] = match[2] ?? match[3] ?? match[4] ?? '';
   }
 
   return attrs;
@@ -210,7 +214,8 @@ export default class ProtectedInsertModal extends FormModal<IProtectedInsertModa
     this.like(parsed.attrs.like === '1');
     this.reply(parsed.attrs.reply === '1');
     this.follow(parsed.attrs.follow === '1');
-    this.followDiscussion(parsed.attrs.followDiscussion === '1');
+    // parseAttrs lowercases every key, matching how s9e stores the attribute.
+    this.followDiscussion(parsed.attrs.followdiscussion === '1');
     this.minlikes(parsed.attrs.minlikes ?? '');
 
     // Normalize whatever time format the author used (absolute date, relative

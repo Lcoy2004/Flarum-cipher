@@ -123,10 +123,11 @@ app.initializers.add('lcoy-cipher', () => {
   setupRealtimeUpdates();
   setupTimeUnlocks();
 
-  // New posts can load lazily (infinite scroll), so re-arm time timers whenever
-  // the DOM gains locked cards. Watch the post stream container instead of the
-  // whole document (typing in a composer would otherwise re-trigger this on
-  // every keystroke), and debounce bursts into a single pass.
+  // New posts can load lazily (infinite scroll), so re-arm time timers and
+  // re-apply session unlocks whenever the DOM gains locked cards. Watch the
+  // post stream container instead of the whole document (typing in a composer
+  // would otherwise re-trigger this on every keystroke), and debounce bursts
+  // into a single pass.
   const stream = document.querySelector<HTMLElement>('.PostStream') || document.body;
   let timerId: number | null = null;
 
@@ -136,6 +137,10 @@ app.initializers.add('lcoy-cipher', () => {
     timerId = window.setTimeout(() => {
       timerId = null;
       setupTimeUnlocks();
+      // Infinite scroll adds new posts after the initial pass; unlocked blocks
+      // in them need the same auto-unlock treatment. Already-unlocked cards
+      // were removed from the DOM, so this never re-attempts them.
+      attemptAutoUnlock();
     }, 300);
   });
 

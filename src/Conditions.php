@@ -49,6 +49,18 @@ class Conditions
      */
     protected array $memo = [];
 
+    /**
+     * Request-scoped time parse results, keyed by the raw attribute value.
+     *
+     * The same block's time gate is evaluated multiple times per request
+     * (statuses(), met/unmet messages, unlock checks, render) — all of them
+     * must agree on a single instant, and re-running the regex/strtotime for
+     * each is pure waste.
+     *
+     * @var array<string,int|null>
+     */
+    protected array $timeMemo = [];
+
     protected function remember(string $key, callable $callback): bool|int
     {
         if (! array_key_exists($key, $this->memo)) {
@@ -69,23 +81,44 @@ class Conditions
             return null;
         }
 
+        if (array_key_exists($value, $this->timeMemo)) {
+            return $this->timeMemo[$value];
+        }
+
         // Bare unix timestamps (as stored by ProtectedFilter for relative times).
         if (preg_match('/^\d{9,10}$/', $value)) {
-            return (int) $value;
+            return $this->timeMemo[$value] = (int) $value;
         }
 
         // Relative offsets such as "+1h", "2d", "30m", "45s" — computed
         // explicitly because strtotime() misparses the ambiguous "h"/"d"
         // shorthands.
-        if (preg_match('/^\+?(\d+)\s*(d|h|m|i|s)\b/i', $value, $m)) {
-            $seconds = ['d' => 86400, 'h' => 3600, 'm' => 60, 'i' => 60, 's' => 1][strtolower($m[2])];
-
-            return time() + (int) $m[1] * $seconds;
+        if (($seconds = self::relativeSeconds($value)) !== null) {
+            return $this->timeMemo[$value] = time() + $seconds;
         }
 
         $timestamp = strtotime($value);
 
-        return $timestamp === false ? null : $timestamp;
+        return $this->timeMemo[$value] = $timestamp === false ? null : $timestamp;
+    }
+
+    /**
+     * Seconds represented by a relative offset such as "+1h", "2d", "30m",
+     * "45s", or null if the value isn't one.
+     *
+     * Shared with ProtectedFilter: parse time normalizes relative offsets to
+     * absolute timestamps anchored to the moment the post was written, and the
+     * render-time fallback (legacy blocks) must interpret them identically.
+     */
+    public static function relativeSeconds(string $value): ?int
+    {
+        if (preg_match('/^\+?(\d+)\s*(d|h|m|i|s)\b/i', $value, $m)) {
+            $seconds = ['d' => 86400, 'h' => 3600, 'm' => 60, 'i' => 60, 's' => 1][strtolower($m[2])];
+
+            return (int) $m[1] * $seconds;
+        }
+
+        return null;
     }
 
     /**

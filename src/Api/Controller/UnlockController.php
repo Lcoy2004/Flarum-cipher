@@ -205,6 +205,9 @@ class UnlockController implements RequestHandlerInterface
      */
     protected function success(CommentPost $post, array $block, ServerRequestInterface $request): JsonResponse
     {
+        // Nested [protected] blocks inside the fragment are re-gated by the
+        // RenderContent render hook (it runs on every Formatter render), so a
+        // block unlocked by its outer password never exposes nested content.
         $html = $this->formatter->render('<r>'.$block['inner'].'</r>', $post, $request);
 
         return new JsonResponse(['success' => true, 'html' => $html]);
