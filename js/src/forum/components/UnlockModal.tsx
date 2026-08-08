@@ -55,6 +55,7 @@ export default class UnlockModal extends FormModal<IUnlockModalAttrs> {
 
   content() {
     const passwordLabel = String(app.translator.trans('lcoy-cipher.forum.password_label'));
+    const passwordHint = String(app.translator.trans('lcoy-cipher.forum.password_unlock_hint'));
 
     return (
       <div className="Modal-body">
@@ -78,7 +79,7 @@ export default class UnlockModal extends FormModal<IUnlockModalAttrs> {
             className="FormControl"
             type="password"
             autocomplete="off"
-            placeholder={passwordLabel}
+            placeholder={passwordHint}
             aria-label={passwordLabel}
             bidi={this.password}
             disabled={this.loading}

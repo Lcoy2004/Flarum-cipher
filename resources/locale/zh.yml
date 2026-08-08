@@ -7,6 +7,8 @@ lcoy-cipher:
     unlock_modal_title: 解锁受保护内容
     unlock_modal_hint: 请输入作者设置的密码以查看此内容。
     password_label: 密码
+    password_optional_hint: 可留空，留空则使用默认密码
+    password_unlock_hint: 请输入密码（作者留空时使用默认密码）
     password_required: 请输入密码后再解锁。
     submit: 确认解锁
     wrong_password: 密码错误，请重试。

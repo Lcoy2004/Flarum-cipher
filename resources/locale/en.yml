@@ -7,6 +7,8 @@ lcoy-cipher:
     unlock_modal_title: Unlock protected content
     unlock_modal_hint: Enter the password set by the author to view this content.
     password_label: Password
+    password_optional_hint: Leave empty to use the default password
+    password_unlock_hint: Enter the password (the default password if left blank)
     password_required: Please enter a password to unlock.
     submit: Unlock
     wrong_password: Incorrect password, please try again.

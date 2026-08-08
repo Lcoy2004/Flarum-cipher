@@ -100,7 +100,12 @@ export default class ProtectedInsertModal extends FormModal<IProtectedInsertModa
       <div className="Modal-body">
         <div className="Form-group">
           <label>{app.translator.trans('lcoy-cipher.forum.password_label')}</label>
-          <input className="FormControl Cipher-insert-password" type="text" bidi={this.password} placeholder="123456" />
+          <input
+            className="FormControl Cipher-insert-password"
+            type="text"
+            bidi={this.password}
+            placeholder={String(app.translator.trans('lcoy-cipher.forum.password_optional_hint'))}
+          />
         </div>
 
         <div className="Form-group">
