@@ -1,4 +1,4 @@
-version: '1.0'
+actionversion: '1.0'
 name: auto-release
 displayName: 自动发布Release          # 必填，显示在流水线列表
 
