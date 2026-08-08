@@ -20,8 +20,18 @@ export interface CipherRequirement {
   message: string;
 }
 
-function requirementDataKey(prefix: string, key: string): string {
-  return `${prefix}${key.charAt(0).toUpperCase()}${key.slice(1)}`;
+/**
+ * Read a data attribute on a locked box by its requirement key.
+ *
+ * Uses getAttribute() instead of `dataset`: the server writes the attribute
+ * with a camel-cased name (e.g. `data-cipher-msg-followDiscussion`), and the
+ * browser lowercases attribute names when it parses the HTML — so the dataset
+ * key becomes `...Followdiscussion` (lowercase "d"), which doesn't match the
+ * camel-cased key used here. getAttribute() is case-insensitive, so it works
+ * for both the camel-cased server output and any lowercased DOM variant.
+ */
+function boxData(box: HTMLElement, kind: 'msg' | 'req', key: string): string | null {
+  return box.getAttribute(`data-cipher-${kind}-${key.toLowerCase()}`);
 }
 
 /**
@@ -30,8 +40,8 @@ function requirementDataKey(prefix: string, key: string): string {
  */
 function boxRequirements(box: HTMLElement): CipherRequirement[] {
   return REQUIREMENT_KEYS.map((key) => {
-    const message = box.dataset[requirementDataKey('cipherMsg', key)];
-    const met = box.dataset[requirementDataKey('cipherReq', key)];
+    const message = boxData(box, 'msg', key);
+    const met = boxData(box, 'req', key);
 
     if (!message) return null;
 
@@ -114,8 +124,20 @@ app.initializers.add('lcoy-cipher', () => {
   setupTimeUnlocks();
 
   // New posts can load lazily (infinite scroll), so re-arm time timers whenever
-  // the DOM gains locked cards.
-  const observer = new MutationObserver(() => setupTimeUnlocks());
+  // the DOM gains locked cards. Watch the post stream container instead of the
+  // whole document (typing in a composer would otherwise re-trigger this on
+  // every keystroke), and debounce bursts into a single pass.
+  const stream = document.querySelector<HTMLElement>('.PostStream') || document.body;
+  let timerId: number | null = null;
 
-  observer.observe(document.body, { childList: true, subtree: true });
+  const observer = new MutationObserver(() => {
+    if (timerId) window.clearTimeout(timerId);
+
+    timerId = window.setTimeout(() => {
+      timerId = null;
+      setupTimeUnlocks();
+    }, 300);
+  });
+
+  observer.observe(stream, { childList: true, subtree: true });
 });

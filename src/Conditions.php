@@ -34,6 +34,29 @@ class Conditions
     }
 
     protected ?bool $hasFollowersTable = null;
+    protected ?bool $hasLikesTable = null;
+
+    /**
+     * Request-scoped query results.
+     *
+     * A single render can evaluate the same condition for several protected
+     * blocks of the same post (and the same actor), so cache each result per
+     * post+actor key to avoid re-issuing the same SQL over and over. The
+     * container gives every consumer its own instance per request, so these
+     * never leak across requests.
+     *
+     * @var array<string,bool|int>
+     */
+    protected array $memo = [];
+
+    protected function remember(string $key, callable $callback): bool|int
+    {
+        if (! array_key_exists($key, $this->memo)) {
+            $this->memo[$key] = $callback();
+        }
+
+        return $this->memo[$key];
+    }
 
     /**
      * Parse a time attribute into a unix timestamp.
@@ -78,10 +101,14 @@ class Conditions
      */
     public function isLikedBy(Post $post, User $actor): bool
     {
-        return $this->db->table('post_likes')
+        if (! $this->hasLikesTable()) {
+            return false;
+        }
+
+        return $this->remember('like.'.$post->id.'.'.$actor->id, fn () => $this->db->table('post_likes')
             ->where('post_id', $post->id)
             ->where('user_id', $actor->id)
-            ->exists();
+            ->exists());
     }
 
     /**
@@ -91,13 +118,13 @@ class Conditions
      */
     public function hasReplied(Post $post, User $actor): bool
     {
-        return $this->db->table('posts')
+        return $this->remember('reply.'.$post->id.'.'.$actor->id, fn () => $this->db->table('posts')
             ->where('discussion_id', $post->discussion_id)
             ->where('user_id', $actor->id)
             ->where('type', 'comment')
             ->where('id', '!=', $post->id)
             ->whereNull('hidden_at')
-            ->exists();
+            ->exists());
     }
 
     /**
@@ -109,10 +136,10 @@ class Conditions
             return false;
         }
 
-        return $this->db->table('user_followers')
+        return $this->remember('follow.'.$post->id.'.'.$actor->id, fn () => $this->db->table('user_followers')
             ->where('user_id', $actor->id)
             ->where('followed_user_id', $post->user_id)
-            ->exists();
+            ->exists());
     }
 
     /**
@@ -123,11 +150,11 @@ class Conditions
      */
     public function hasFollowedDiscussion(Post $post, User $actor): bool
     {
-        return $this->db->table('discussion_user')
+        return $this->remember('discussion.'.$post->id.'.'.$actor->id, fn () => $this->db->table('discussion_user')
             ->where('user_id', $actor->id)
             ->where('discussion_id', $post->discussion_id)
             ->where('subscription', 'follow')
-            ->exists();
+            ->exists());
     }
 
     /**
@@ -135,7 +162,11 @@ class Conditions
      */
     public function likeCount(Post $post): int
     {
-        return (int) $this->db->table('post_likes')->where('post_id', $post->id)->count();
+        if (! $this->hasLikesTable()) {
+            return 0;
+        }
+
+        return $this->remember('likes.'.$post->id, fn () => (int) $this->db->table('post_likes')->where('post_id', $post->id)->count());
     }
 
     /**
@@ -182,5 +213,10 @@ class Conditions
     protected function hasFollowersTable(): bool
     {
         return $this->hasFollowersTable ??= $this->db->getSchemaBuilder()->hasTable('user_followers');
+    }
+
+    protected function hasLikesTable(): bool
+    {
+        return $this->hasLikesTable ??= $this->db->getSchemaBuilder()->hasTable('post_likes');
     }
 }

@@ -2,8 +2,10 @@ import app from 'flarum/forum/app';
 import FormModal, { IFormModalAttrs } from 'flarum/common/components/FormModal';
 import Button from 'flarum/common/components/Button';
 import Stream from 'flarum/common/utils/Stream';
+import type Mithril from 'mithril';
 import type RequestError from 'flarum/common/utils/RequestError';
 import type { CipherRequirement } from '../index';
+import { fetchPostStatus } from '../utils/realtime';
 import { unlockBlock } from '../utils/unlock';
 
 // Note: `m` is intentionally not imported — Flarum 2.x patches the global
@@ -19,6 +21,29 @@ export interface IUnlockModalAttrs extends IFormModalAttrs {
 export default class UnlockModal extends FormModal<IUnlockModalAttrs> {
   password = Stream('');
   error = '';
+
+  oncreate(vnode: Mithril.VnodeDOM<IUnlockModalAttrs>) {
+    super.oncreate(vnode);
+
+    // The requirements passed in are the snapshot the server rendered when
+    // the page was drawn. If the visitor liked/replied/followed just now, the
+    // checklist would be stale, so refresh it from the status API. This is
+    // deliberately fire-and-forget: the modal is still usable without it.
+    fetchPostStatus(this.attrs.postId)
+      .then((blocks) => {
+        const block = blocks.find((b) => b.id === this.attrs.cipherId);
+
+        if (block) {
+          this.attrs.requirements = Object.entries(block.reqs).map(([key, status]) => ({
+            key,
+            met: status.met,
+            message: status.message,
+          }));
+          m.redraw();
+        }
+      })
+      .catch(() => {});
+  }
 
   className() {
     return 'CipherUnlockModal Modal--small';

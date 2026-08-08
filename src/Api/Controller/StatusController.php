@@ -17,6 +17,7 @@ use Flarum\Formatter\Formatter;
 use Flarum\Http\RequestUtil;
 use Flarum\Locale\TranslatorInterface;
 use Flarum\Post\CommentPost;
+use Illuminate\Contracts\Cache\Repository as Cache;
 use Laminas\Diactoros\Response\JsonResponse;
 use Lcoy\Cipher\Conditions;
 use Lcoy\Cipher\RequirementStatus;
@@ -38,11 +39,22 @@ use Psr\Http\Server\RequestHandlerInterface;
  */
 class StatusController implements RequestHandlerInterface
 {
+    /**
+     * Responses are cached for this long so visitors hammering the endpoint
+     * (or a whole discussion of locked cards being refreshed at once) share
+     * the same work instead of re-parsing the XML and re-running the
+     * condition queries for every request. Posts gated by `minlikes` bypass
+     * the cache entirely: their status changes the moment someone else likes
+     * the post, so the real-time refresh must always see fresh data.
+     */
+    private const CACHE_TTL_SECONDS = 10;
+
     public function __construct(
         protected Formatter $formatter,
         protected TranslatorInterface $translator,
         protected Conditions $conditions,
-        protected RequirementStatus $requirements
+        protected RequirementStatus $requirements,
+        protected Cache $cache
     ) {
     }
 
@@ -66,6 +78,45 @@ class StatusController implements RequestHandlerInterface
         if (! $xml || ! str_contains($xml, '<PROTECTED')) {
             return $this->success([]);
         }
+
+        // minlikes and time conditions are time-sensitive: minlikes changes the
+        // moment someone likes the post, and a cached response without the
+        // rendered html could keep the client's scheduled unlock from firing.
+        // Bypass the cache for those posts so real-time behavior always sees
+        // fresh data; the cache still absorbs repeated polls of the actor-scoped
+        // conditions (like/reply/follow/followDiscussion).
+        $uncached = str_contains($xml, 'minlikes') || str_contains($xml, 'time=');
+
+        $blocks = $this->blocksFor($post, $xml, $request, $uncached);
+
+        return $this->success($blocks);
+    }
+
+    /**
+     * Build the status payload for every protected block, caching the result
+     * unless the post is gated by a minlikes condition.
+     *
+     * @return array<int,array<string,mixed>>
+     */
+    protected function blocksFor(CommentPost $post, string $xml, ServerRequestInterface $request, bool $uncached): array
+    {
+        $actor = RequestUtil::getActor($request);
+
+        if (! $uncached) {
+            $key = 'lcoy-cipher.status.'.$post->id.'.'.($actor ? $actor->id : 'guest');
+
+            return $this->cache->remember($key, self::CACHE_TTL_SECONDS, fn () => $this->computeBlocks($post, $xml, $request));
+        }
+
+        return $this->computeBlocks($post, $xml, $request);
+    }
+
+    /**
+     * @return array<int,array<string,mixed>>
+     */
+    protected function computeBlocks(CommentPost $post, string $xml, ServerRequestInterface $request): array
+    {
+        $actor = RequestUtil::getActor($request);
 
         $dom = new DOMDocument;
         $dom->loadXML('<cipher-root>'.$xml.'</cipher-root>', LIBXML_NONET | LIBXML_COMPACT);
@@ -119,7 +170,7 @@ class StatusController implements RequestHandlerInterface
             $blocks[] = $block;
         }
 
-        return $this->success($blocks);
+        return $blocks;
     }
 
     protected function success(array $blocks): JsonResponse

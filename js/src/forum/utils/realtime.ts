@@ -29,7 +29,7 @@ export async function fetchPostStatus(postId: number): Promise<CipherBlockStatus
 
 /**
  * Apply a status payload to the locked card of a block by patching the ✓/✗
- * checklist in place (dataset + icon classes + message text).
+ * checklist in place (data attributes + icon classes + message text).
  *
  * Only data attributes and text are touched — never the node tree — so this
  * can't race with Mithril's redraw cycle.
@@ -40,8 +40,12 @@ export function applyBlockStatus(block: CipherBlockStatus): void {
   if (!box) return;
 
   Object.entries(block.reqs ?? {}).forEach(([key, status]) => {
-    box.dataset[`cipherReq${key.charAt(0).toUpperCase()}${key.slice(1)}`] = status.met ? '1' : '0';
-    box.dataset[`cipherMsg${key.charAt(0).toUpperCase()}${key.slice(1)}`] = status.message;
+    // Attribute names are lowercased by the browser when HTML is parsed, and
+    // the dataset accessor for camel-cased keys (e.g. followDiscussion) then
+    // doesn't line up. getAttribute/setAttribute are case-insensitive, so use
+    // them for both reading and writing to stay consistent.
+    box.setAttribute(`data-cipher-req-${key.toLowerCase()}`, status.met ? '1' : '0');
+    box.setAttribute(`data-cipher-msg-${key.toLowerCase()}`, status.message);
 
     const row = box.querySelector<HTMLElement>(`.Cipher-box-req--${key}`);
 

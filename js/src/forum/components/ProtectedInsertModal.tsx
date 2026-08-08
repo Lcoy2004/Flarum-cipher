@@ -155,22 +155,34 @@ export default class ProtectedInsertModal extends FormModal<IProtectedInsertModa
   /**
    * Quick time presets: now +1h, +6h, +12h, +1d, +3d. Options map datetime
    * value → label, so the select feeds straight into the time field.
+   *
+   * Computed once per page load: the option values are wall-clock strings of
+   * fixed offsets from the moment the modal was first opened, and their labels
+   * are static translations. Recomputing on every render would give the Select
+   * a brand-new options object each time (plus slightly different values),
+   * which causes needless re-renders.
    */
   protected quickTimeOptions(): Record<string, string> {
-    const presets: [string, number][] = [
-      ['lcoy-cipher.forum.quick_time_1h', 3600],
-      ['lcoy-cipher.forum.quick_time_6h', 6 * 3600],
-      ['lcoy-cipher.forum.quick_time_12h', 12 * 3600],
-      ['lcoy-cipher.forum.quick_time_1d', 86400],
-      ['lcoy-cipher.forum.quick_time_3d', 3 * 86400],
-    ];
+    if (!ProtectedInsertModal.quickTimeOptionsCache) {
+      const presets: [string, number][] = [
+        ['lcoy-cipher.forum.quick_time_1h', 3600],
+        ['lcoy-cipher.forum.quick_time_6h', 6 * 3600],
+        ['lcoy-cipher.forum.quick_time_12h', 12 * 3600],
+        ['lcoy-cipher.forum.quick_time_1d', 86400],
+        ['lcoy-cipher.forum.quick_time_3d', 3 * 86400],
+      ];
 
-    return presets.reduce<Record<string, string>>((map, [key, seconds]) => {
-      map[this.toDatetimeLocal(new Date(Date.now() + seconds * 1000))] = String(app.translator.trans(key));
+      ProtectedInsertModal.quickTimeOptionsCache = presets.reduce<Record<string, string>>((map, [key, seconds]) => {
+        map[this.toDatetimeLocal(new Date(Date.now() + seconds * 1000))] = String(app.translator.trans(key));
 
-      return map;
-    }, {});
+        return map;
+      }, {});
+    }
+
+    return ProtectedInsertModal.quickTimeOptionsCache;
   }
+
+  protected static quickTimeOptionsCache: Record<string, string> | null = null;
 
   /**
    * Format a Date as the value used by <input type="datetime-local">:
@@ -230,10 +242,39 @@ export default class ProtectedInsertModal extends FormModal<IProtectedInsertModa
     }
 
     if (this.time()) {
-      attrs.push(`time="${this.time()}"`);
+      const timestamp = ProtectedInsertModal.toUnixTime(this.time());
+
+      if (timestamp != null) {
+        attrs.push(`time="${timestamp}"`);
+      }
     }
 
     return `[protected ${attrs.join(' ')}]${this.tagInner}[/protected]`;
+  }
+
+  /**
+   * Convert a time value (datetime-local string or unix timestamp) into the
+   * unix seconds the server expects.
+   *
+   * The datetime-local input reports the wall-clock time in the visitor's own
+   * timezone, while the server would parse the raw string with strtotime() in
+   * the server's timezone (typically UTC) — that shifts the scheduled
+   * visibility by the timezone offset. Normalizing to an absolute unix
+   * timestamp here makes the moment unambiguous regardless of the visitor's
+   * or the server's timezone.
+   */
+  static toUnixTime(time: string): number | null {
+    const trimmed = time.trim();
+
+    // Already a unix timestamp (e.g. re-editing a block the server stored as
+    // an absolute timestamp): pass it through untouched.
+    if (/^\d{9,10}$/.test(trimmed)) {
+      return parseInt(trimmed, 10);
+    }
+
+    const timestamp = new Date(trimmed).getTime();
+
+    return Number.isNaN(timestamp) ? null : Math.floor(timestamp / 1000);
   }
 
   /**
