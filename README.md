@@ -9,6 +9,12 @@
 - 可视化编辑弹窗：发帖工具栏 🔒 按钮内提供勾选式条件、快捷时间下拉，无需手写 BBCode
 - 作者、管理员与版主无需密码，直接查看原始内容
 
+## 仓库地址
+
+- Gitee：<https://gitee.com/lcoy/flarum-cipher>
+- GitHub：<https://github.com/Lcoy2004/Flarum-cipher>
+- Packagist：<https://packagist.org/packages/lcoy/cipher>
+
 ## 安装
 
 ```bash
