@@ -62,7 +62,7 @@ class ParseProtected
                         // Author left the password empty → apply the hashed default
                         // password so it never appears in plaintext anywhere.
                         $attrs = str_replace($pm[0], 'password="'.password_hash($defaultPassword, PASSWORD_DEFAULT).'"', $attrs);
-                    } elseif (! preg_match('/^\$(?:2[ayb]\$\d{2}|argon2)/', $password)) {
+                    } elseif (! ProtectedFilter::isHashed($password)) {
                         // Don't re-hash values that already look like bcrypt/argon2
                         // hashes (e.g. the raw text reconstructed by unparse() when a
                         // post is edited).

@@ -34,6 +34,14 @@ interface ParsedTag {
 const TAG_RE = /\[protected\b([^\]]*)\]([\s\S]*?)\[\/protected\]/i;
 
 /**
+ * Matches bcrypt/argon2 hashes, mirroring the server-side check in
+ * ProtectedFilter: a stored post's BBCode carries the hashed password (s9e
+ * unparse() reconstructs the raw text from the parsed XML), and that hash must
+ * never be shown in the password field or re-hashed.
+ */
+const HASH_RE = /^\$(?:2[ayb]\$\d{2}|argon2)/;
+
+/**
  * Parse the attribute list of a [protected] tag into key/value pairs.
  *
  * Keys are normalized to lowercase: BBCode attribute names are
@@ -72,6 +80,13 @@ export default class ProtectedInsertModal extends FormModal<IProtectedInsertModa
   // avoid shadowing the Modal base class's `inner()` method.
   protected tagInner = '';
 
+  // The hashed password of the tag being edited, if any. Kept out of the
+  // visible field; an empty input then means "keep the existing password"
+  // instead of falling back to the default password.
+  protected existingHash: string | null = null;
+
+  protected error = '';
+
   oncreate(vnode: Mithril.VnodeDOM<IProtectedInsertModalAttrs, this>) {
     super.oncreate(vnode);
 
@@ -99,12 +114,18 @@ export default class ProtectedInsertModal extends FormModal<IProtectedInsertModa
     return (
       <div className="Modal-body">
         <div className="Form-group">
-          <label>{app.translator.trans('lcoy-cipher.forum.password_label')}</label>
+          <label>{app.translator.trans('lcoy-cipher.forum.password_optional_label')}</label>
           <input
             className="FormControl Cipher-insert-password"
             type="text"
             bidi={this.password}
-            placeholder={String(app.translator.trans('lcoy-cipher.forum.password_optional_hint'))}
+            placeholder={String(
+              app.translator.trans(
+                this.attrs.existing && this.existingHash
+                  ? 'lcoy-cipher.forum.password_keep_hint'
+                  : 'lcoy-cipher.forum.password_optional_hint'
+              )
+            )}
           />
         </div>
 
@@ -147,6 +168,8 @@ export default class ProtectedInsertModal extends FormModal<IProtectedInsertModa
           </div>
         </div>
 
+        {this.error && <div className="CipherUnlockModal-error">{this.error}</div>}
+
         <div className="Form-group">
           <Button className="Button Button--primary Button--block" type="submit">
             {app.translator.trans('lcoy-cipher.forum.confirm_insert')}
@@ -158,6 +181,15 @@ export default class ProtectedInsertModal extends FormModal<IProtectedInsertModa
 
   onsubmit(e: SubmitEvent) {
     e.preventDefault();
+
+    // A bare `"` inside the BBCode attribute would break the tag open (s9e
+    // parses it as plain text), silently turning the protected content into
+    // visible source code — reject it up front instead.
+    if (this.password().includes('"')) {
+      this.error = String(app.translator.trans('lcoy-cipher.forum.password_invalid_quote'));
+      m.redraw();
+      return;
+    }
 
     this.attrs.onSubmit(this.buildBBCode());
     this.hide();
@@ -214,7 +246,17 @@ export default class ProtectedInsertModal extends FormModal<IProtectedInsertModa
 
     if (!parsed) return;
 
-    this.password(parsed.attrs.password ?? '');
+    const password = parsed.attrs.password ?? '';
+
+    // Stored posts carry the hashed password (s9e unparse() reconstructs it
+    // from the parsed XML). Never surface the hash in the field: an empty
+    // input then keeps the existing password instead of replacing it.
+    if (HASH_RE.test(password)) {
+      this.existingHash = password;
+    } else {
+      this.password(password);
+    }
+
     this.titleValue(parsed.attrs.title ?? '');
     this.like(parsed.attrs.like === '1');
     this.reply(parsed.attrs.reply === '1');
@@ -238,10 +280,27 @@ export default class ProtectedInsertModal extends FormModal<IProtectedInsertModa
    * Generate the [protected] BBCode from the current form values.
    */
   protected buildBBCode(): string {
-    const attrs: string[] = [`password="${this.password()}"`];
+    const attrs: string[] = [];
+
+    const entered = this.password();
+
+    if (entered) {
+      // A bare `"` would break the attribute open (s9e parses the rest as
+      // plain text), silently exposing the protected content. onsubmit already
+      // rejects it; the replacement is a safety net for other paths.
+      attrs.push(`password="${entered.replace(/"/g, "'")}"`);
+    } else if (this.existingHash) {
+      // Editing a stored tag: an empty password keeps the existing hash.
+      attrs.push(`password="${this.existingHash}"`);
+    } else {
+      // New block without a password → the server applies the default.
+      attrs.push('password=""');
+    }
 
     if (this.titleValue()) {
-      attrs.push(`title="${this.titleValue()}"`);
+      // Same quote-safety as the password, applied silently (titles aren't
+      // secrets, so a straight substitution is fine).
+      attrs.push(`title="${this.titleValue().replace(/"/g, "'")}"`);
     }
 
     if (this.like()) attrs.push('like="1"');

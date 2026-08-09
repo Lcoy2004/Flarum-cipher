@@ -33,7 +33,7 @@ class ProtectedFilter
 
         // ParseProtected already hashes the raw text; this also covers input
         // that slipped past the pre-parse pass. Never re-hash an existing hash.
-        if (is_string($password) && $password !== '' && ! preg_match('/^\$(?:2[ayb]\$\d{2}|argon2)/', $password)) {
+        if (is_string($password) && $password !== '' && ! self::isHashed($password)) {
             $tag->setAttribute('password', password_hash($password, PASSWORD_DEFAULT));
         }
 
@@ -46,5 +46,17 @@ class ProtectedFilter
         if (is_string($time) && $time !== '' && ($seconds = Conditions::relativeSeconds($time)) !== null) {
             $tag->setAttribute('time', (string) (time() + $seconds));
         }
+    }
+
+    /**
+     * Whether a password value already looks like a bcrypt/argon2 hash.
+     *
+     * Shared with ParseProtected so the parse-time pre-hash and the safety-net
+     * filter agree on what counts as "already hashed" (e.g. the raw text s9e
+     * reconstructs via unparse() when a post is edited).
+     */
+    public static function isHashed(string $password): bool
+    {
+        return (bool) preg_match('/^\$(?:2[ayb]\$\d{2}|argon2)/', $password);
     }
 }
