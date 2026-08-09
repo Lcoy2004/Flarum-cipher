@@ -142,4 +142,4 @@ npm run build
 
 ## 许可证
 
-MIT
+ AFL-3.0
