@@ -30,8 +30,11 @@ interface ParsedTag {
 
 /**
  * Regex matching a complete [protected ...]content[/protected] tag.
+ *
+ * Quoted attribute values may contain "]", so they are matched as whole quoted
+ * strings (mirrors the server-side ParseProtected pattern).
  */
-const TAG_RE = /\[protected\b([^\]]*)\]([\s\S]*?)\[\/protected\]/i;
+const TAG_RE = /\[protected\b((?:[^"'[\]]|"[^"]*"|'[^']*')*)\]([\s\S]*?)\[\/protected\]/i;
 
 /**
  * Matches bcrypt/argon2 hashes, mirroring the server-side check in
@@ -59,6 +62,16 @@ function parseAttrs(attrText: string): Record<string, string> {
   }
 
   return attrs;
+}
+
+/**
+ * Format a Date as the value used by <input type="datetime-local">:
+ * YYYY-MM-DDTHH:mm in the browser's local timezone.
+ */
+function toDatetimeLocal(date: Date): string {
+  const pad = (n: number) => String(n).padStart(2, '0');
+
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
 }
 
 /**
@@ -159,7 +172,14 @@ export default class ProtectedInsertModal extends FormModal<IProtectedInsertModa
             <Select
               className="Cipher-insert-quicktime"
               options={this.quickTimeOptions()}
-              onchange={(value: string) => value && this.time(String(value))}
+              onchange={(value: string) => {
+                // Redraw so the datetime-local field below shows the preset the
+                // user just picked (Select's onchange doesn't redraw by itself).
+                if (value) {
+                  this.time(String(value));
+                  m.redraw();
+                }
+              }}
               placeholder={String(app.translator.trans('lcoy-cipher.forum.quick_time_placeholder'))}
             />
           </div>
@@ -216,7 +236,7 @@ export default class ProtectedInsertModal extends FormModal<IProtectedInsertModa
       ];
 
       ProtectedInsertModal.quickTimeOptionsCache = presets.reduce<Record<string, string>>((map, [key, seconds]) => {
-        map[this.toDatetimeLocal(new Date(Date.now() + seconds * 1000))] = String(app.translator.trans(key));
+        map[toDatetimeLocal(new Date(Date.now() + seconds * 1000))] = String(app.translator.trans(key));
 
         return map;
       }, {});
@@ -226,16 +246,6 @@ export default class ProtectedInsertModal extends FormModal<IProtectedInsertModa
   }
 
   protected static quickTimeOptionsCache: Record<string, string> | null = null;
-
-  /**
-   * Format a Date as the value used by <input type="datetime-local">:
-   * YYYY-MM-DDTHH:mm in the browser's local timezone.
-   */
-  protected toDatetimeLocal(date: Date): string {
-    const pad = (n: number) => String(n).padStart(2, '0');
-
-    return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
-  }
 
   /**
    * Fill the form from an existing [protected] tag so users can tweak and
@@ -376,13 +386,7 @@ export default class ProtectedInsertModal extends FormModal<IProtectedInsertModa
     if (/^\d{9,10}$/.test(trimmed)) {
       const date = new Date(parseInt(trimmed, 10) * 1000);
 
-      if (!Number.isNaN(date.getTime())) {
-        const pad = (n: number) => String(n).padStart(2, '0');
-
-        return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
-      }
-
-      return '';
+      return Number.isNaN(date.getTime()) ? '' : toDatetimeLocal(date);
     }
 
     // ISO-ish "2026-08-09 12:00" / "2026-08-09T12:00" — feed straight back in.
@@ -395,12 +399,6 @@ export default class ProtectedInsertModal extends FormModal<IProtectedInsertModa
     // Fall back to parsing through JS Date.
     const date = new Date(trimmed);
 
-    if (!Number.isNaN(date.getTime())) {
-      const pad = (n: number) => String(n).padStart(2, '0');
-
-      return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
-    }
-
-    return '';
+    return Number.isNaN(date.getTime()) ? '' : toDatetimeLocal(date);
   }
 }

@@ -21,6 +21,7 @@ use Flarum\Settings\SettingsRepositoryInterface;
 use Illuminate\Contracts\Cache\Repository as Cache;
 use Laminas\Diactoros\Response\JsonResponse;
 use Lcoy\Cipher\Conditions;
+use Lcoy\Cipher\ProtectedFilter;
 use Psr\Http\Message\ResponseInterface;
 use Psr\Http\Message\ServerRequestInterface;
 use Psr\Http\Server\RequestHandlerInterface;
@@ -156,7 +157,7 @@ class UnlockController implements RequestHandlerInterface
             // Legacy block parsed before the default-password feature: fall back
             // to the configured default password so the author's empty
             // `password=""` still unlocks.
-            $hash = password_hash($this->defaultPassword(), PASSWORD_DEFAULT);
+            $hash = password_hash(ProtectedFilter::defaultPassword($this->settings), PASSWORD_DEFAULT);
         }
 
         $inner = '';
@@ -188,13 +189,6 @@ class UnlockController implements RequestHandlerInterface
             ]),
             default => $this->translator->trans('lcoy-cipher.forum.unlock_error'),
         };
-    }
-
-    protected function defaultPassword(): string
-    {
-        $default = (string) $this->settings->get('lcoy-cipher.default_password', '');
-
-        return $default === '' ? 'cipher' : $default;
     }
 
     /**

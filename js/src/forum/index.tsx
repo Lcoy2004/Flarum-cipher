@@ -49,6 +49,50 @@ function boxRequirements(box: HTMLElement): CipherRequirement[] {
   }).filter(Boolean) as CipherRequirement[];
 }
 
+interface EditorSelection {
+  start: number;
+  end: number;
+  selected: string;
+  failed: boolean;
+}
+
+/**
+ * Read the current selection of an editor driver without touching `.el` — a
+ * property only the textarea-based BasicEditorDriver exposes. Rich-text
+ * drivers (FoF/Rich Text, Tiptap-based) expose the Tiptap editor through
+ * `tiptapEditor` on the TextEditor; their getSelectionRange() returns
+ * ProseMirror positions, so the selected text is read from the ProseMirror doc
+ * via textBetween() rather than slicing the markdown `value` state (which
+ * would misalign wherever formatting marks shift the offsets).
+ */
+function editorSelection(editor: { getSelectionRange: () => number[] }, textEditor: TextEditor): EditorSelection {
+  let start = 0;
+  let end = 0;
+  let selected = '';
+  let failed = false;
+
+  try {
+    const range = editor.getSelectionRange();
+    start = range[0] ?? 0;
+    end = range[1] ?? start;
+
+    const tiptap = (textEditor as { tiptapEditor?: { state?: { doc?: { textBetween?: (from: number, to: number) => string } } } })
+      .tiptapEditor;
+
+    if (tiptap?.state?.doc?.textBetween) {
+      selected = tiptap.state.doc.textBetween(start, end);
+    } else {
+      selected = ((editor as { el?: HTMLTextAreaElement }).el?.value ?? '').slice(start, end);
+    }
+  } catch {
+    // Editor not ready / selection unavailable — fall back to inserting at the
+    // cursor.
+    failed = true;
+  }
+
+  return { start, end, selected, failed };
+}
+
 app.initializers.add('lcoy-cipher', () => {
   // Delegate clicks on the server-rendered unlock buttons, opening the modal
   // for the corresponding protected block.
@@ -87,8 +131,7 @@ app.initializers.add('lcoy-cipher', () => {
           // The composer may not be attached yet (e.g. quick reply collapsed).
           if (!editor) return;
 
-          const [start, end] = editor.getSelectionRange();
-          const selected = editor.el.value.slice(start, end);
+          const { start, end, selected, failed } = editorSelection(editor, this);
 
           // If the selection already wraps a [protected] block, edit it in
           // place; otherwise wrap the selection (or the placeholder text).
@@ -97,6 +140,11 @@ app.initializers.add('lcoy-cipher', () => {
           const placeholder = String(app.translator.trans('lcoy-cipher.forum.placeholder_content'));
 
           const insert = (bbcode: string) => {
+            if (failed) {
+              editor.insertAtCursor(bbcode);
+              return;
+            }
+
             if (existing) {
               // Replace the whole existing tag, keeping its position.
               editor.insertBetween(start, end, bbcode, true);

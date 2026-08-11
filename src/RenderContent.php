@@ -98,9 +98,9 @@ class RenderContent
 
             // Scheduled visibility: once the time is reached the block is
             // visible to everyone, no password required.
-            if ($post !== null && $actor !== null
-                && ($target = $this->conditions->timeTarget($attrs)) !== null
-                && time() >= $target) {
+            $target = $post !== null && $actor !== null ? $this->conditions->timeTarget($attrs) : null;
+
+            if ($target !== null && time() >= $target) {
                 continue;
             }
 
@@ -123,11 +123,6 @@ class RenderContent
                 $node->setAttribute('data-post-id', (string) $post->id);
             }
 
-            // The password is always set server-side (the author's, or the
-            // configured default for empty attributes), so the locked card
-            // always requires a password to unlock.
-            $node->setAttribute('data-cipher-password', '1');
-
             // Embed every configured visibility condition with its current
             // satisfaction status (1 = met, 0 = unmet) plus a human-readable
             // message, so the locked card and the unlock modal can show a
@@ -139,7 +134,7 @@ class RenderContent
 
             // Expose the unlock timestamp of a time-gated block so the
             // frontend can schedule a one-shot refresh instead of polling.
-            if (($target = $this->conditions->timeTarget($attrs)) !== null && time() < $target) {
+            if ($target !== null && time() < $target) {
                 $node->setAttribute('data-cipher-target', (string) $target);
             }
 

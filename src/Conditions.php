@@ -35,6 +35,7 @@ class Conditions
 
     protected ?bool $hasFollowersTable = null;
     protected ?bool $hasLikesTable = null;
+    protected ?bool $hasDiscussionFollowTable = null;
 
     /**
      * Request-scoped query results.
@@ -131,10 +132,12 @@ class Conditions
 
     /**
      * @return bool whether the actor has liked the post
+     *
+     * Guests cannot like posts, so skip the query entirely for them.
      */
     public function isLikedBy(Post $post, User $actor): bool
     {
-        if (! $this->hasLikesTable()) {
+        if ($actor->isGuest() || ! $this->hasLikesTable()) {
             return false;
         }
 
@@ -162,10 +165,12 @@ class Conditions
 
     /**
      * @return bool whether the actor follows the post author
+     *
+     * Guests cannot follow anyone, so skip the query entirely for them.
      */
     public function followsAuthor(Post $post, User $actor): bool
     {
-        if (! $post->user_id || ! $this->hasFollowersTable()) {
+        if ($actor->isGuest() || ! $post->user_id || ! $this->hasFollowersTable()) {
             return false;
         }
 
@@ -179,10 +184,16 @@ class Conditions
      * @return bool whether the actor follows the post's discussion
      *
      * Requires the flarum-subscriptions extension, which stores the state in
-     * discussion_user.subscription ('follow' | 'ignore').
+     * discussion_user.subscription ('follow' | 'ignore'). If the extension
+     * isn't installed the table doesn't exist, so the condition can never be
+     * met. Guests cannot follow, so skip the query entirely for them.
      */
     public function hasFollowedDiscussion(Post $post, User $actor): bool
     {
+        if ($actor->isGuest() || ! $this->hasDiscussionFollowTable()) {
+            return false;
+        }
+
         return $this->remember('discussion.'.$post->id.'.'.$actor->id, fn () => $this->db->table('discussion_user')
             ->where('user_id', $actor->id)
             ->where('discussion_id', $post->discussion_id)
@@ -251,5 +262,10 @@ class Conditions
     protected function hasLikesTable(): bool
     {
         return $this->hasLikesTable ??= $this->db->getSchemaBuilder()->hasTable('post_likes');
+    }
+
+    protected function hasDiscussionFollowTable(): bool
+    {
+        return $this->hasDiscussionFollowTable ??= $this->db->getSchemaBuilder()->hasTable('discussion_user');
     }
 }

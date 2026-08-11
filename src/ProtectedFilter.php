@@ -11,6 +11,7 @@
 
 namespace Lcoy\Cipher;
 
+use Flarum\Settings\SettingsRepositoryInterface;
 use s9e\TextFormatter\Parser\Tag;
 
 class ProtectedFilter
@@ -58,5 +59,19 @@ class ProtectedFilter
     public static function isHashed(string $password): bool
     {
         return (bool) preg_match('/^\$(?:2[ayb]\$\d{2}|argon2)/', $password);
+    }
+
+    /**
+     * The password used when an author leaves the password empty.
+     *
+     * Shared by ParseProtected (applies the hashed default at parse time) and
+     * UnlockController (falls back to it for legacy blocks), so the fallback
+     * can never drift apart.
+     */
+    public static function defaultPassword(SettingsRepositoryInterface $settings): string
+    {
+        $default = (string) $settings->get('lcoy-cipher.default_password', '');
+
+        return $default === '' ? 'cipher' : $default;
     }
 }

@@ -49,7 +49,9 @@ class RequirementStatus
         // or `minlikes="0"` doesn't gate anything, so skip it).
         $configured = [];
 
-        if ($this->conditions->timeTarget($attrs) !== null) {
+        $timeTarget = $this->conditions->timeTarget($attrs);
+
+        if ($timeTarget !== null) {
             $configured[] = 'time';
         }
 
@@ -75,9 +77,7 @@ class RequirementStatus
 
             $statuses[$key] = [
                 'met' => $met,
-                'message' => $met
-                    ? $this->metMessage($key, $attrs)
-                    : $this->unmetMessage($key, $attrs),
+                'message' => $this->message($key, $attrs, $met, $timeTarget),
             ];
         }
 
@@ -85,39 +85,22 @@ class RequirementStatus
     }
 
     /**
-     * Message shown while a condition is not yet satisfied.
+     * Human-readable message for a condition, depending on whether it is
+     * already satisfied (met_*) or still required (need_*).
      */
-    protected function unmetMessage(string $key, array $attrs): string
+    protected function message(string $key, array $attrs, bool $met, ?int $timeTarget): string
     {
-        return match ($key) {
-            'time' => $this->translator->trans('lcoy-cipher.forum.need_time', [
-                'time' => date('Y-m-d H:i', $this->conditions->timeTarget($attrs)),
-            ]),
-            'like' => $this->translator->trans('lcoy-cipher.forum.need_like'),
-            'reply' => $this->translator->trans('lcoy-cipher.forum.need_reply'),
-            'follow' => $this->translator->trans('lcoy-cipher.forum.need_follow'),
-            'followDiscussion' => $this->translator->trans('lcoy-cipher.forum.need_follow_discussion'),
-            'minlikes' => $this->translator->trans('lcoy-cipher.forum.need_minlikes', [
-                'count' => (int) ($attrs['minlikes'] ?? 0),
-            ]),
-            default => '',
-        };
-    }
+        $prefix = $met ? 'met_' : 'need_';
 
-    /**
-     * Message shown once a condition is satisfied.
-     */
-    protected function metMessage(string $key, array $attrs): string
-    {
         return match ($key) {
-            'time' => $this->translator->trans('lcoy-cipher.forum.met_time', [
-                'time' => date('Y-m-d H:i', $this->conditions->timeTarget($attrs)),
+            'time' => $this->translator->trans('lcoy-cipher.forum.'.$prefix.'time', [
+                'time' => date('Y-m-d H:i', $timeTarget),
             ]),
-            'like' => $this->translator->trans('lcoy-cipher.forum.met_like'),
-            'reply' => $this->translator->trans('lcoy-cipher.forum.met_reply'),
-            'follow' => $this->translator->trans('lcoy-cipher.forum.met_follow'),
-            'followDiscussion' => $this->translator->trans('lcoy-cipher.forum.met_follow_discussion'),
-            'minlikes' => $this->translator->trans('lcoy-cipher.forum.met_minlikes', [
+            'like' => $this->translator->trans('lcoy-cipher.forum.'.$prefix.'like'),
+            'reply' => $this->translator->trans('lcoy-cipher.forum.'.$prefix.'reply'),
+            'follow' => $this->translator->trans('lcoy-cipher.forum.'.$prefix.'follow'),
+            'followDiscussion' => $this->translator->trans('lcoy-cipher.forum.'.$prefix.'follow_discussion'),
+            'minlikes' => $this->translator->trans('lcoy-cipher.forum.'.$prefix.'minlikes', [
                 'count' => (int) ($attrs['minlikes'] ?? 0),
             ]),
             default => '',

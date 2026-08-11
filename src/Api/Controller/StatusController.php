@@ -17,6 +17,7 @@ use Flarum\Formatter\Formatter;
 use Flarum\Http\RequestUtil;
 use Flarum\Locale\TranslatorInterface;
 use Flarum\Post\CommentPost;
+use Flarum\User\User;
 use Illuminate\Contracts\Cache\Repository as Cache;
 use Laminas\Diactoros\Response\JsonResponse;
 use Lcoy\Cipher\Conditions;
@@ -87,7 +88,7 @@ class StatusController implements RequestHandlerInterface
         // conditions (like/reply/follow/followDiscussion).
         $uncached = str_contains($xml, 'minlikes') || str_contains($xml, 'time=');
 
-        $blocks = $this->blocksFor($post, $xml, $request, $uncached);
+        $blocks = $this->blocksFor($post, $xml, $actor, $request, $uncached);
 
         return $this->success($blocks);
     }
@@ -98,26 +99,22 @@ class StatusController implements RequestHandlerInterface
      *
      * @return array<int,array<string,mixed>>
      */
-    protected function blocksFor(CommentPost $post, string $xml, ServerRequestInterface $request, bool $uncached): array
+    protected function blocksFor(CommentPost $post, string $xml, ?User $actor, ServerRequestInterface $request, bool $uncached): array
     {
-        $actor = RequestUtil::getActor($request);
-
         if (! $uncached) {
             $key = 'lcoy-cipher.status.'.$post->id.'.'.($actor ? $actor->id : 'guest');
 
-            return $this->cache->remember($key, self::CACHE_TTL_SECONDS, fn () => $this->computeBlocks($post, $xml, $request));
+            return $this->cache->remember($key, self::CACHE_TTL_SECONDS, fn () => $this->computeBlocks($post, $xml, $actor, $request));
         }
 
-        return $this->computeBlocks($post, $xml, $request);
+        return $this->computeBlocks($post, $xml, $actor, $request);
     }
 
     /**
      * @return array<int,array<string,mixed>>
      */
-    protected function computeBlocks(CommentPost $post, string $xml, ServerRequestInterface $request): array
+    protected function computeBlocks(CommentPost $post, string $xml, ?User $actor, ServerRequestInterface $request): array
     {
-        $actor = RequestUtil::getActor($request);
-
         $dom = new DOMDocument;
         $dom->loadXML('<cipher-root>'.$xml.'</cipher-root>', LIBXML_NONET | LIBXML_COMPACT);
 

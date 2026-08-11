@@ -45,7 +45,7 @@ class ParseProtected
             return $text;
         }
 
-        $defaultPassword = $this->defaultPassword();
+        $defaultPassword = ProtectedFilter::defaultPassword($this->settings);
 
         return preg_replace_callback(
             // Match the opening tag of a [protected ...] block. Quoted attribute
@@ -55,7 +55,10 @@ class ParseProtected
                 $attrs = $m[1];
 
                 // Password may be quoted or unquoted; normalize to a quoted value.
-                if (preg_match('/\bpassword\s*=\s*(?:"([^"]*)"|([^\s"\'\[\]]+))/', $attrs, $pm)) {
+                // Case-insensitive to match s9e, which accepts attribute names in
+                // any case (a PASSWORD="x" that slipped through here would leave
+                // the plaintext in the <s> unparse marker).
+                if (preg_match('/\bpassword\s*=\s*(?:"([^"]*)"|([^\s"\'\[\]]+))/i', $attrs, $pm)) {
                     $password = $pm[1] !== '' ? $pm[1] : ($pm[2] ?? '');
 
                     if ($password === '') {
@@ -77,12 +80,5 @@ class ParseProtected
             },
             $text
         ) ?? $text;
-    }
-
-    protected function defaultPassword(): string
-    {
-        $default = (string) $this->settings->get('lcoy-cipher.default_password', '');
-
-        return $default === '' ? 'cipher' : $default;
     }
 }
