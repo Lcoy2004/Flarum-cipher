@@ -54,12 +54,14 @@ class ParseProtected
             function (array $m) use ($defaultPassword): string {
                 $attrs = $m[1];
 
-                // Password may be quoted or unquoted; normalize to a quoted value.
-                // Case-insensitive to match s9e, which accepts attribute names in
-                // any case (a PASSWORD="x" that slipped through here would leave
-                // the plaintext in the <s> unparse marker).
-                if (preg_match('/\bpassword\s*=\s*(?:"([^"]*)"|([^\s"\'\[\]]+))/i', $attrs, $pm)) {
-                    $password = $pm[1] !== '' ? $pm[1] : ($pm[2] ?? '');
+                // Password may be quoted (double or single) or unquoted;
+                // normalize to a quoted value. Case-insensitive to match s9e,
+                // which accepts attribute names in any case (a PASSWORD="x" that
+                // slipped through here would leave the plaintext in the <s>
+                // unparse marker). PREG_UNMATCHED_AS_NULL distinguishes the three
+                // capture groups so an empty quoted password is preserved.
+                if (preg_match('/\bpassword\s*=\s*(?:"([^"]*)"|\'([^\']*)\'|([^\s"\'\[\]]+))/i', $attrs, $pm, PREG_UNMATCHED_AS_NULL)) {
+                    $password = $pm[1] ?? $pm[2] ?? $pm[3] ?? '';
 
                     if ($password === '') {
                         // Author left the password empty → apply the hashed default
@@ -72,8 +74,12 @@ class ParseProtected
                         $attrs = str_replace($pm[0], 'password="'.password_hash($password, PASSWORD_DEFAULT).'"', $attrs);
                     }
                 } else {
-                    // No password attribute at all → apply the hashed default password.
-                    $attrs = trim($attrs).' password="'.password_hash($defaultPassword, PASSWORD_DEFAULT).'"';
+                    // No password attribute at all → apply the hashed default
+                    // password. rtrim (not trim) keeps the leading space that
+                    // separates the tag name from its attributes — trim() would
+                    // produce "[protectedlike=...]", which s9e can't parse and
+                    // would leak the content as plain text.
+                    $attrs = rtrim($attrs).' password="'.password_hash($defaultPassword, PASSWORD_DEFAULT).'"';
                 }
 
                 return '[protected'.$attrs.']';
