@@ -139,21 +139,25 @@ app.initializers.add('lcoy-cipher', () => {
 
           const placeholder = String(app.translator.trans('lcoy-cipher.forum.placeholder_content'));
 
+          const CLOSING_TAG = '[/protected]';
+
           const insert = (bbcode: string) => {
             if (failed) {
               editor.insertAtCursor(bbcode);
               return;
             }
 
+            // The opening tag is everything before the closing tag.
+            const openTag = bbcode.slice(0, bbcode.length - CLOSING_TAG.length);
+
             if (existing) {
               // Replace the whole existing tag, keeping its position.
               editor.insertBetween(start, end, bbcode, true);
-              editor.moveCursorTo(start + bbcode.length - '[/protected]'.length);
+              editor.moveCursorTo(start + bbcode.length - CLOSING_TAG.length);
             } else {
               const content = selected || placeholder;
-              const template = `${bbcode.slice(0, bbcode.length - '[/protected]'.length)}${content}[/protected]`;
-              editor.insertBetween(start, end, template, false);
-              editor.moveCursorTo(start + bbcode.slice(0, bbcode.length - '[/protected]'.length).length);
+              editor.insertBetween(start, end, `${openTag}${content}${CLOSING_TAG}`, false);
+              editor.moveCursorTo(start + openTag.length);
             }
           };
 
