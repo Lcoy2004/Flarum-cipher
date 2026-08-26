@@ -11,8 +11,6 @@
 
 namespace Lcoy\Cipher\Api\Controller;
 
-use DOMDocument;
-use DOMXPath;
 use Flarum\Formatter\Formatter;
 use Flarum\Http\RequestUtil;
 use Flarum\Locale\TranslatorInterface;
@@ -22,6 +20,7 @@ use Illuminate\Contracts\Cache\Repository as Cache;
 use Laminas\Diactoros\Response\JsonResponse;
 use Lcoy\Cipher\Conditions;
 use Lcoy\Cipher\ProtectedFilter;
+use Lcoy\Cipher\ProtectedXml;
 use Psr\Http\Message\ResponseInterface;
 use Psr\Http\Message\ServerRequestInterface;
 use Psr\Http\Server\RequestHandlerInterface;
@@ -108,7 +107,13 @@ class UnlockController implements RequestHandlerInterface
             return $this->error(429, $this->translator->trans('lcoy-cipher.forum.too_many_attempts'));
         }
 
-        if (! password_verify($password, $block['hash'])) {
+        // Legacy blocks (empty hash) are checked against the default
+        // password directly — no bcrypt involved.
+        $verified = $block['hash'] !== ''
+            ? password_verify($password, $block['hash'])
+            : hash_equals(ProtectedFilter::defaultPassword($this->settings), $password);
+
+        if (! $verified) {
             $this->cache->put($attemptKey, (int) $this->cache->get($attemptKey, 0) + 1, self::WINDOW_SECONDS);
 
             return $this->error(403, $this->translator->trans('lcoy-cipher.forum.wrong_password'));
@@ -128,9 +133,10 @@ class UnlockController implements RequestHandlerInterface
 
     /**
      * Find a protected block in the post's parsed XML and extract its password
-     * hash, inner content and visibility condition attributes.
+     * hash (empty for legacy blocks, see handle()), inner content and
+     * visibility condition attributes.
      *
-     * @return array{hash: string, inner: string, like: string, reply: string, follow: string, minlikes: string, time: string}|null
+     * @return array{hash: string, inner: string, like: string, reply: string, follow: string, followdiscussion: string, minlikes: string, time: string}|null
      */
     protected function findBlock(CommentPost $post, string $cipherId): ?array
     {
@@ -140,32 +146,21 @@ class UnlockController implements RequestHandlerInterface
             return null;
         }
 
-        $dom = new DOMDocument;
-        $dom->loadXML('<cipher-root>'.$xml.'</cipher-root>', LIBXML_NONET | LIBXML_COMPACT);
+        $dom = ProtectedXml::load($xml);
 
-        $xpath = new DOMXPath($dom);
-        $nodes = $xpath->query('//PROTECTED[@id = "'.$cipherId.'"]');
+        $node = ProtectedXml::findNode($dom, $cipherId);
 
-        if (! $nodes || $nodes->length === 0) {
+        if ($node === null) {
             return null;
         }
 
-        $node = $nodes->item(0);
-
+        // An empty hash marks a legacy block parsed before the
+        // default-password feature; handle() verifies those against the
+        // configured default password directly instead of bcrypt-hashing it
+        // on every request (which would run before the rate-limit check).
         $hash = $node->getAttribute('password');
-        if ($hash === '') {
-            // Legacy block parsed before the default-password feature: fall back
-            // to the configured default password so the author's empty
-            // `password=""` still unlocks.
-            $hash = password_hash(ProtectedFilter::defaultPassword($this->settings), PASSWORD_DEFAULT);
-        }
 
-        $inner = '';
-        foreach ($node->childNodes as $child) {
-            $inner .= $dom->saveXML($child);
-        }
-
-        $block = ['hash' => $hash, 'inner' => $inner];
+        $block = ['hash' => $hash, 'inner' => ProtectedXml::innerXml($dom, $node)];
 
         // s9e lowercases attribute names, so read every attribute with its
         // lowercase key.

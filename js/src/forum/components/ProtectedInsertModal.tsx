@@ -29,12 +29,12 @@ interface ParsedTag {
 }
 
 /**
- * Regex matching a complete [protected ...]content[/protected] tag.
+ * Regex matching the opening tag of a [protected] block.
  *
  * Quoted attribute values may contain "]", so they are matched as whole quoted
- * strings (mirrors the server-side ParseProtected pattern).
+ * strings.
  */
-const TAG_RE = /\[protected\b((?:[^"'[\]]|"[^"]*"|'[^']*')*)\]([\s\S]*?)\[\/protected\]/i;
+const TAG_OPEN_RE = /\[protected\b((?:[^"'[\]]|"[^"]*"|'[^']*')*)\]/i;
 
 /**
  * Matches bcrypt/argon2 hashes, mirroring the server-side check in
@@ -180,7 +180,6 @@ export default class ProtectedInsertModal extends FormModal<IProtectedInsertModa
                   m.redraw();
                 }
               }}
-              placeholder={String(app.translator.trans('lcoy-cipher.forum.quick_time_placeholder'))}
             />
           </div>
           <div className="Cipher-insert-row Cipher-insert-row--time-field">
@@ -219,6 +218,12 @@ export default class ProtectedInsertModal extends FormModal<IProtectedInsertModa
    * Quick time presets: now +1h, +6h, +12h, +1d, +3d. Options map datetime
    * value → label, so the select feeds straight into the time field.
    *
+   * The map is prefixed with an empty-value placeholder option: Flarum's
+   * Select has no `placeholder` support (the attr would be passed through to
+   * the <select> element and ignored by browsers), so an option with an empty
+   * value is the only way to show the "Quick time…" hint instead of having
+   * the first preset look pre-selected.
+   *
    * Computed once per page load: the option values are wall-clock strings of
    * fixed offsets from the moment the modal was first opened, and their labels
    * are static translations. Recomputing on every render would give the Select
@@ -235,11 +240,15 @@ export default class ProtectedInsertModal extends FormModal<IProtectedInsertModa
         ['lcoy-cipher.forum.quick_time_3d', 3 * 86400],
       ];
 
+      const options: Record<string, string> = {
+        '': String(app.translator.trans('lcoy-cipher.forum.quick_time_placeholder')),
+      };
+
       ProtectedInsertModal.quickTimeOptionsCache = presets.reduce<Record<string, string>>((map, [key, seconds]) => {
         map[toDatetimeLocal(new Date(Date.now() + seconds * 1000))] = String(app.translator.trans(key));
 
         return map;
-      }, {});
+      }, options);
     }
 
     return ProtectedInsertModal.quickTimeOptionsCache;
@@ -362,13 +371,38 @@ export default class ProtectedInsertModal extends FormModal<IProtectedInsertModa
    * Extract the attributes and inner content of a [protected] tag.
    */
   static parseTag(tag: string): ParsedTag | null {
-    const match = TAG_RE.exec(tag);
+    const open = TAG_OPEN_RE.exec(tag);
 
-    if (!match) return null;
+    if (!open) return null;
+
+    // Find the closing tag matching the opening one, counting nesting depth
+    // so a selection containing nested [protected] blocks keeps its full
+    // inner content instead of being truncated at the first (inner) closing
+    // tag.
+    const tokenRe = /\[protected(?![\w-])|\[\/protected\]/gi;
+    tokenRe.lastIndex = open.index + open[0].length;
+
+    let depth = 1;
+    let closeIndex = -1;
+
+    let token: RegExpExecArray | null;
+
+    while ((token = tokenRe.exec(tag)) !== null) {
+      if (token[0][1] === '/') {
+        if (--depth === 0) {
+          closeIndex = token.index;
+          break;
+        }
+      } else {
+        depth++;
+      }
+    }
+
+    if (closeIndex === -1) return null;
 
     return {
-      attrs: parseAttrs(match[1]),
-      inner: match[2],
+      attrs: parseAttrs(open[1]),
+      inner: tag.slice(open.index + open[0].length, closeIndex),
       source: tag,
     };
   }

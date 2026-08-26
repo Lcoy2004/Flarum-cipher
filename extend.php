@@ -12,6 +12,8 @@
 namespace Lcoy\Cipher;
 
 use Flarum\Extend;
+use Flarum\Likes\Event\PostWasLiked;
+use Flarum\Likes\Event\PostWasUnliked;
 
 return [
     (new Extend\Frontend('forum'))
@@ -41,8 +43,8 @@ return [
     // Real-time updates: broadcast a lightweight event when a minlikes-gated
     // post is liked, so visitors see the checklist flip without reloading.
     (new Extend\Event())
-        ->listen(Flarum\Likes\Event\PostWasLiked::class, Listener\PushPostUpdate::class)
-        ->listen(Flarum\Likes\Event\PostWasUnliked::class, Listener\PushPostUpdate::class),
+        ->listen(PostWasLiked::class, Listener\PushPostUpdate::class)
+        ->listen(PostWasUnliked::class, Listener\PushPostUpdate::class),
 
     (new Extend\Settings())
         ->default('lcoy-cipher.allow_guest_unlock', true)

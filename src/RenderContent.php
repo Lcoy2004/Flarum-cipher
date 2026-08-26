@@ -11,8 +11,6 @@
 
 namespace Lcoy\Cipher;
 
-use DOMDocument;
-use DOMXPath;
 use Flarum\Http\RequestUtil;
 use Flarum\Locale\TranslatorInterface;
 use Flarum\Post\Post;
@@ -82,17 +80,11 @@ class RenderContent
      */
     protected function lockAll(string $xml, ?Post $post, ?User $actor): string
     {
-        $dom = new DOMDocument;
-        $dom->loadXML('<cipher-root>'.$xml.'</cipher-root>', LIBXML_NONET | LIBXML_COMPACT);
-
-        $xpath = new DOMXPath($dom);
-        $nodes = $xpath->query('//PROTECTED');
+        $dom = ProtectedXml::load($xml);
 
         // Process bottom-up so nested blocks are removed before their parents.
-        for ($i = $nodes->length - 1; $i >= 0; $i--) {
-            $node = $nodes->item($i);
-
-            $attrs = $this->nodeAttributes($node);
+        foreach (array_reverse(ProtectedXml::protectedNodes($dom)) as $node) {
+            $attrs = ProtectedXml::attributes($node);
             $id = $attrs['id'] ?? '';
             $title = $attrs['title'] ?? null;
 
@@ -132,9 +124,10 @@ class RenderContent
                 $node->setAttribute('data-cipher-msg-'.$key, $status['message']);
             }
 
-            // Expose the unlock timestamp of a time-gated block so the
-            // frontend can schedule a one-shot refresh instead of polling.
-            if ($target !== null && time() < $target) {
+            // Expose the unlock timestamp of a time-gated block (the gate is
+            // necessarily unreached here — reached ones were skipped above) so
+            // the frontend can schedule a one-shot refresh instead of polling.
+            if ($target !== null) {
                 $node->setAttribute('data-cipher-target', (string) $target);
             }
 
@@ -144,25 +137,6 @@ class RenderContent
             }
         }
 
-        $result = '';
-        foreach ($dom->documentElement->childNodes as $child) {
-            $result .= $dom->saveXML($child);
-        }
-
-        return $result;
-    }
-
-    /**
-     * @return array<string,string>
-     */
-    protected function nodeAttributes(\DOMElement $node): array
-    {
-        $attrs = [];
-
-        foreach ($node->attributes as $attribute) {
-            $attrs[$attribute->nodeName] = $attribute->nodeValue;
-        }
-
-        return $attrs;
+        return ProtectedXml::save($dom);
     }
 }

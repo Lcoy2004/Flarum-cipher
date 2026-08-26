@@ -17,6 +17,32 @@ use s9e\TextFormatter\Parser;
 
 class ParseProtected
 {
+    /**
+     * Opening tag of a [protected ...] block, mirroring s9e's own BBCode
+     * attribute grammar so the pre-parse pass and the parser always agree on
+     * where the tag ends and what its attribute values are:
+     *
+     *  - attribute names are [-\w]+ and must be followed immediately by "="
+     *    (s9e ignores names without one, and allows no whitespace there);
+     *  - a value may be double- or single-quoted (and may then contain "]"),
+     *    or unquoted, in which case s9e consumes everything up to the next
+     *    whitespace-then-attribute or "]" — quotes included. That unquoted
+     *    branch is copied verbatim from s9e's parser regex, so a hand-written
+     *    [protected password=ab"c] is matched here and its password hashed,
+     *    instead of leaking into the stored <s> unparse marker.
+     *
+     * The (?![\w-]) after the tag name keeps [protected-like] (a different
+     * BBCode for s9e) untouched.
+     */
+    protected const TAG_OPEN = '~\[protected(?![\w-])((?:\s*[-\w]+(?:=(?:"[^"]*"|\'[^\']*\'|(?:[^\s\]]|[ \t](?!\s*(?:[-\w]+=|/?\))))*))?)*)\s*\]~i';
+
+    /**
+     * The password attribute inside an opening tag, with the same value
+     * grammar as TAG_OPEN. The lookarounds require "password" to be a whole
+     * attribute name (not a fragment such as "my-password").
+     */
+    protected const PASSWORD = '~(?<![\w-])password(?![\w-])=(?:"([^"]*)"|\'([^\']*)\'|((?:[^\s\]]|[ \t](?!\s*(?:[-\w]+=|/?\))))*))~i';
+
     public function __construct(
         protected SettingsRepositoryInterface $settings
     ) {
@@ -48,19 +74,17 @@ class ParseProtected
         $defaultPassword = ProtectedFilter::defaultPassword($this->settings);
 
         return preg_replace_callback(
-            // Match the opening tag of a [protected ...] block. Quoted attribute
-            // values may contain "]", so they are matched as whole quoted strings.
-            '/\[protected\b((?:[^"\'\[\]]|"[^"]*"|\'[^\']*\')*)\]/i',
+            self::TAG_OPEN,
             function (array $m) use ($defaultPassword): string {
                 $attrs = $m[1];
 
                 // Password may be quoted (double or single) or unquoted;
                 // normalize to a quoted value. Case-insensitive to match s9e,
-                // which accepts attribute names in any case (a PASSWORD="x" that
-                // slipped through here would leave the plaintext in the <s>
-                // unparse marker). PREG_UNMATCHED_AS_NULL distinguishes the three
-                // capture groups so an empty quoted password is preserved.
-                if (preg_match('/\bpassword\s*=\s*(?:"([^"]*)"|\'([^\']*)\'|([^\s"\'\[\]]+))/i', $attrs, $pm, PREG_UNMATCHED_AS_NULL)) {
+                // which lowercases attribute names. PREG_UNMATCHED_AS_NULL
+                // distinguishes the three capture groups so an empty value
+                // (a bare password= or an empty quoted password="") is
+                // preserved.
+                if (preg_match(self::PASSWORD, $attrs, $pm, PREG_UNMATCHED_AS_NULL)) {
                     $password = $pm[1] ?? $pm[2] ?? $pm[3] ?? '';
 
                     if ($password === '') {

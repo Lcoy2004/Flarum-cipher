@@ -11,8 +11,6 @@
 
 namespace Lcoy\Cipher\Api\Controller;
 
-use DOMDocument;
-use DOMXPath;
 use Flarum\Formatter\Formatter;
 use Flarum\Http\RequestUtil;
 use Flarum\Locale\TranslatorInterface;
@@ -21,6 +19,7 @@ use Flarum\User\User;
 use Illuminate\Contracts\Cache\Repository as Cache;
 use Laminas\Diactoros\Response\JsonResponse;
 use Lcoy\Cipher\Conditions;
+use Lcoy\Cipher\ProtectedXml;
 use Lcoy\Cipher\RequirementStatus;
 use Psr\Http\Message\ResponseInterface;
 use Psr\Http\Message\ServerRequestInterface;
@@ -41,12 +40,13 @@ use Psr\Http\Server\RequestHandlerInterface;
 class StatusController implements RequestHandlerInterface
 {
     /**
-     * Responses are cached for this long so visitors hammering the endpoint
-     * (or a whole discussion of locked cards being refreshed at once) share
-     * the same work instead of re-parsing the XML and re-running the
-     * condition queries for every request. Posts gated by `minlikes` bypass
-     * the cache entirely: their status changes the moment someone else likes
-     * the post, so the real-time refresh must always see fresh data.
+     * Guest responses are cached for this long so anonymous visitors
+     * hammering the endpoint share the same work instead of re-parsing the
+     * XML and re-running the condition queries for every request. Logged-in
+     * visitors are never cached (their own actions flip conditions), and
+     * posts gated by `minlikes` or `time` bypass the cache entirely: their
+     * status changes with other users' likes or the clock, so the real-time
+     * refresh must always see fresh data.
      */
     private const CACHE_TTL_SECONDS = 10;
 
@@ -95,16 +95,22 @@ class StatusController implements RequestHandlerInterface
 
     /**
      * Build the status payload for every protected block, caching the result
-     * unless the post is gated by a minlikes condition.
+     * for guests only.
+     *
+     * A guest's conditions never change (they cannot like, reply or follow),
+     * so the cache can safely absorb repeated polls for them. Logged-in
+     * visitors, however, can flip like/reply/follow conditions with their own
+     * actions at any moment — serving them a cached snapshot written before
+     * the action would show a stale ✗ checklist that disagrees with the
+     * server's live unlock verdict. Posts gated by minlikes or time bypass
+     * the cache for everyone (see handle()).
      *
      * @return array<int,array<string,mixed>>
      */
     protected function blocksFor(CommentPost $post, string $xml, ?User $actor, ServerRequestInterface $request, bool $uncached): array
     {
-        if (! $uncached) {
-            $key = 'lcoy-cipher.status.'.$post->id.'.'.($actor ? $actor->id : 'guest');
-
-            return $this->cache->remember($key, self::CACHE_TTL_SECONDS, fn () => $this->computeBlocks($post, $xml, $actor, $request));
+        if (! $uncached && $actor?->isGuest()) {
+            return $this->cache->remember('lcoy-cipher.status.'.$post->id.'.guest', self::CACHE_TTL_SECONDS, fn () => $this->computeBlocks($post, $xml, $actor, $request));
         }
 
         return $this->computeBlocks($post, $xml, $actor, $request);
@@ -115,20 +121,12 @@ class StatusController implements RequestHandlerInterface
      */
     protected function computeBlocks(CommentPost $post, string $xml, ?User $actor, ServerRequestInterface $request): array
     {
-        $dom = new DOMDocument;
-        $dom->loadXML('<cipher-root>'.$xml.'</cipher-root>', LIBXML_NONET | LIBXML_COMPACT);
-
-        $xpath = new DOMXPath($dom);
-        $nodes = $xpath->query('//PROTECTED');
+        $dom = ProtectedXml::load($xml);
 
         $blocks = [];
 
-        foreach ($nodes as $node) {
-            $attrs = [];
-
-            foreach ($node->attributes as $attribute) {
-                $attrs[$attribute->nodeName] = $attribute->nodeValue;
-            }
+        foreach (ProtectedXml::protectedNodes($dom) as $node) {
+            $attrs = ProtectedXml::attributes($node);
 
             $id = $attrs['id'] ?? '';
 
@@ -158,12 +156,7 @@ class StatusController implements RequestHandlerInterface
             $target = $this->conditions->timeTarget($attrs);
 
             if ($target !== null && time() >= $target) {
-                $inner = '';
-                foreach ($node->childNodes as $child) {
-                    $inner .= $dom->saveXML($child);
-                }
-
-                $block['html'] = $this->formatter->render('<r>'.$inner.'</r>', $post, $request);
+                $block['html'] = $this->formatter->render('<r>'.ProtectedXml::innerXml($dom, $node).'</r>', $post, $request);
             }
 
             $blocks[] = $block;

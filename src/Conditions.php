@@ -150,10 +150,15 @@ class Conditions
     /**
      * @return bool whether the actor has replied in the discussion
      *
-     * Hidden/deleted replies don't count — only visible comments.
+     * Hidden/deleted replies don't count — only visible comments. Guests
+     * cannot reply, so skip the query entirely for them.
      */
     public function hasReplied(Post $post, User $actor): bool
     {
+        if ($actor->isGuest()) {
+            return false;
+        }
+
         return $this->remember('reply.'.$post->id.'.'.$actor->id, fn () => $this->db->table('posts')
             ->where('discussion_id', $post->discussion_id)
             ->where('user_id', $actor->id)
