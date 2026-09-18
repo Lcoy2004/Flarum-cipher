@@ -21,6 +21,7 @@
         "source": "https://gitee.com/lcoy/flarum-cipher"
     },
     "require": {
+        "php": "^8.3",
         "flarum/core": "^2.0.0"
     },
     "autoload": {

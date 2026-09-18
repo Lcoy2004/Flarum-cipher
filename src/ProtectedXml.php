@@ -29,13 +29,41 @@ final class ProtectedXml
     /**
      * Load a post's stored parsed XML into a document wrapped in
      * <cipher-root>.
+     *
+     * The wrapped document always has a root element, even when the stored XML
+     * is malformed (corrupted content, a fragment written by a different
+     * formatter, an undeclared namespace prefix). In that case the fragment is
+     * unparseable, so no protected region can be identified: callers see zero
+     * protected nodes and save() yields an empty string, i.e. the content is
+     * dropped rather than passed through. Failing closed is deliberate — the
+     * alternative (returning the original XML) would leak gated content.
+     *
+     * libxml reports malformed input as warnings plus a false return; they are
+     * collected here instead of reaching the error log, since an unparseable
+     * post is an expected (if rare) condition that every caller already
+     * handles.
      */
     public static function load(string $xml): DOMDocument
     {
         $dom = new DOMDocument;
-        $dom->loadXML('<cipher-root>'.$xml.'</cipher-root>', LIBXML_NONET | LIBXML_COMPACT);
 
-        return $dom;
+        $internalErrors = libxml_use_internal_errors(true);
+
+        try {
+            $loaded = $dom->loadXML('<cipher-root>'.$xml.'</cipher-root>', LIBXML_NONET | LIBXML_COMPACT);
+        } finally {
+            libxml_clear_errors();
+            libxml_use_internal_errors($internalErrors);
+        }
+
+        if ($loaded) {
+            return $dom;
+        }
+
+        $empty = new DOMDocument;
+        $empty->loadXML('<cipher-root/>');
+
+        return $empty;
     }
 
     /**
@@ -103,6 +131,8 @@ final class ProtectedXml
 
     /**
      * Serialize the document's wrapped fragment back to XML.
+     *
+     * Expects a document from load(), which guarantees a root element.
      */
     public static function save(DOMDocument $dom): string
     {
