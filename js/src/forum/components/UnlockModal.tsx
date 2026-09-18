@@ -111,8 +111,6 @@ export default class UnlockModal extends FormModal<IUnlockModalAttrs> {
     unlockBlock(this.attrs.postId, this.attrs.cipherId, this.password())
       .then(() => this.hide())
       .catch((err: RequestError) => {
-        this.loading = false;
-
         // Prefer the message returned by the server (wrong password, unmet
         // visibility conditions, time gate, ...).
         const detail = err.response?.errors?.[0]?.detail || (err.response as any)?.error;
@@ -127,7 +125,8 @@ export default class UnlockModal extends FormModal<IUnlockModalAttrs> {
           this.error = String(app.translator.trans('lcoy-cipher.forum.unlock_error'));
         }
 
-        m.redraw();
+        // Base-class helper: clears `loading` and redraws.
+        this.loaded();
       });
   }
 }

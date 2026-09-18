@@ -18,7 +18,7 @@
         }
     ],
     "support": {
-        "source": "https://gitee.com/lcoy/Flarum_Cipher"
+        "source": "https://gitee.com/lcoy/flarum-cipher"
     },
     "require": {
         "flarum/core": "^2.0.0"

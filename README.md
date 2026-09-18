@@ -66,7 +66,7 @@ npm run build
 | --- | --- | --- |
 | 点赞 | `like="1"` | 必须给本帖点过赞 |
 | 回复 | `reply="1"` | 必须在本讨论中回复过（隐藏/删除的回复不计） |
-| 关注作者 | `follow="1"` | 必须关注帖子作者（依赖 `flarum-tags` 或具备 `user_followers` 表的扩展） |
+| 关注作者 | `follow="1"` | 必须关注帖子作者（依赖提供 `user_followers` 表的扩展，如 `ianm/follow-users`） |
 | 关注本帖 | `followDiscussion="1"` | 必须关注本讨论（依赖 `flarum-subscriptions`，订阅状态为 `follow`） |
 | 赞数达标 | `minlikes="10"` | 本帖总赞数达到 N 个 |
 | 定时可见 | `time="2026-08-09 12:00"` | 到指定时间后自动公开，无需密码 |
@@ -135,11 +135,11 @@ npm run build
 请确认是在**当前账号**下操作：`like` / `reply` / `follow` / `followDiscussion` 判断的是当前登录用户自己的行为；`minlikes` 判断的是帖子总赞数。访客账号无法满足点赞 / 回复 / 关注类条件。
 
 **问：`follow` 和 `followDiscussion` 有什么区别？**
-`follow` 关注的是**帖子作者**（依赖 `user_followers` 表，由 `flarum-tags` 等扩展提供）；`followDiscussion` 关注的是**当前讨论**（依赖 `flarum-subscriptions`，订阅状态为 `follow`）。两者独立判定，可同时启用。
+`follow` 关注的是**帖子作者**（依赖提供 `user_followers` 表的扩展，如 `ianm/follow-users`）；`followDiscussion` 关注的是**当前讨论**（依赖 `flarum-subscriptions`，订阅状态为 `follow`）。两者独立判定，可同时启用。
 
 **问：`followDiscussion` 启用了但提示未满足？**
 请到帖子右上角的订阅菜单确认已选择「关注」（follow）状态。「忽略」或默认不订阅都不会算作已关注。
 
 ## 许可证
 
- AFL-3.0
+MIT

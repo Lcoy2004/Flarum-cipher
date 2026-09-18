@@ -129,14 +129,36 @@ function scheduleRefresh(postId: number): void {
  * Subscribe to the forum's WebSocket channel (flarum-pusher / flarum-realtime)
  * and refresh affected locked cards when the server reports a change, e.g. a
  * minlikes-gated post was liked by someone else.
+ *
+ * flarum-pusher assigns `app.pusher` inside Application#mount, which runs after
+ * every initializer has finished — so when this is called from our initializer
+ * the socket never exists yet. Waiting for it (bounded) is what makes the
+ * subscription actually happen; when flarum-pusher isn't installed the wait
+ * simply expires.
  */
+const PUSHER_MAX_WAIT_MS = 5000;
+const PUSHER_POLL_INTERVAL_MS = 250;
+
 export function setupRealtimeUpdates(): void {
+  waitForPusher(Date.now() + PUSHER_MAX_WAIT_MS);
+}
+
+function waitForPusher(deadline: number): void {
   const pusher = (app as any).pusher;
 
   // flarum-pusher exposes `app.pusher` as a promise; other realtime extensions
-  // expose a compatible socket binding. If none is available, silently skip.
-  if (!pusher || typeof pusher.then !== 'function') return;
+  // expose a compatible socket binding.
+  if (pusher && typeof pusher.then === 'function') {
+    bindCipherChannel(pusher);
+    return;
+  }
 
+  if (Date.now() >= deadline) return;
+
+  window.setTimeout(() => waitForPusher(deadline), PUSHER_POLL_INTERVAL_MS);
+}
+
+function bindCipherChannel(pusher: Promise<any>): void {
   pusher.then((binding: any) => {
     if (!binding?.pusher?.bind) return;
 
