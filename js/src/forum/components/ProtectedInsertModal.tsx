@@ -218,14 +218,16 @@ export default class ProtectedInsertModal extends FormModal<IProtectedInsertModa
    * value is the only way to show the "Quick time…" hint instead of having
    * the first preset look pre-selected.
    *
-   * Computed once per page load: the option values are wall-clock strings of
-   * fixed offsets from the moment the modal was first opened, and their labels
-   * are static translations. Recomputing on every render would give the Select
-   * a brand-new options object each time (plus slightly different values),
-   * which causes needless re-renders.
+   * Computed once per modal instance: the option values are wall-clock strings
+   * derived from "now", so recomputing them on every render would hand the
+   * Select a brand-new options object each time (plus slightly different
+   * values), causing needless re-renders. Caching them for the page's lifetime
+   * is worse than that: a tab left open for hours would keep offering "in 1
+   * hour" presets whose timestamp is already in the past, silently publishing
+   * the content immediately instead of an hour later.
    */
   protected quickTimeOptions(): Record<string, string> {
-    if (!ProtectedInsertModal.quickTimeOptionsCache) {
+    if (!this.quickTimeOptionsCache) {
       const presets: [string, number][] = [
         ['lcoy-cipher.forum.quick_time_1h', 3600],
         ['lcoy-cipher.forum.quick_time_6h', 6 * 3600],
@@ -238,17 +240,17 @@ export default class ProtectedInsertModal extends FormModal<IProtectedInsertModa
         '': String(app.translator.trans('lcoy-cipher.forum.quick_time_placeholder')),
       };
 
-      ProtectedInsertModal.quickTimeOptionsCache = presets.reduce<Record<string, string>>((map, [key, seconds]) => {
+      this.quickTimeOptionsCache = presets.reduce<Record<string, string>>((map, [key, seconds]) => {
         map[toDatetimeLocal(new Date(Date.now() + seconds * 1000))] = String(app.translator.trans(key));
 
         return map;
       }, options);
     }
 
-    return ProtectedInsertModal.quickTimeOptionsCache;
+    return this.quickTimeOptionsCache;
   }
 
-  protected static quickTimeOptionsCache: Record<string, string> | null = null;
+  protected quickTimeOptionsCache: Record<string, string> | null = null;
 
   /**
    * Fill the form from an existing [protected] tag so users can tweak and
