@@ -3,6 +3,7 @@ import { extend } from 'flarum/common/extend';
 import TextEditor from 'flarum/common/components/TextEditor';
 import Button from 'flarum/common/components/Button';
 import type ItemList from 'flarum/common/utils/ItemList';
+import type Mithril from 'mithril';
 
 export { default as extend } from './extend';
 
@@ -57,6 +58,17 @@ interface EditorSelection {
 }
 
 /**
+ * The subset of Flarum's editor-driver API the insert flow relies on
+ * (mirrors BasicEditorDriver; rich-text drivers implement the same methods).
+ */
+interface EditorDriverLike {
+  getSelectionRange: () => number[];
+  insertAtCursor: (text: string) => void;
+  insertBetween: (selectionStart: number, selectionEnd: number, text: string) => void;
+  moveCursorTo: (position: number) => void;
+}
+
+/**
  * Read the current selection of an editor driver without touching `.el` — a
  * property only the textarea-based BasicEditorDriver exposes. Rich-text
  * drivers (FoF/Rich Text, Tiptap-based) expose the Tiptap editor through
@@ -65,7 +77,7 @@ interface EditorSelection {
  * via textBetween() rather than slicing the markdown `value` state (which
  * would misalign wherever formatting marks shift the offsets).
  */
-function editorSelection(editor: { getSelectionRange: () => number[] }, textEditor: TextEditor): EditorSelection {
+function editorSelection(editor: EditorDriverLike, textEditor: TextEditor): EditorSelection {
   let start = 0;
   let end = 0;
   let selected = '';
@@ -76,8 +88,7 @@ function editorSelection(editor: { getSelectionRange: () => number[] }, textEdit
     start = range[0] ?? 0;
     end = range[1] ?? start;
 
-    const tiptap = (textEditor as { tiptapEditor?: { state?: { doc?: { textBetween?: (from: number, to: number) => string } } } })
-      .tiptapEditor;
+    const tiptap = (textEditor as { tiptapEditor?: { state?: { doc?: { textBetween?: (from: number, to: number) => string } } } }).tiptapEditor;
 
     if (tiptap?.state?.doc?.textBetween) {
       selected = tiptap.state.doc.textBetween(start, end);
@@ -118,7 +129,7 @@ app.initializers.add('lcoy-cipher', () => {
   // Composer toolbar button that opens a visual editor for the [protected]
   // BBCode — password, title and visibility conditions. If the selection
   // contains an existing tag it is pre-filled for editing.
-  extend(TextEditor.prototype, 'toolbarItems', function (this: TextEditor, items: ItemList) {
+  extend(TextEditor.prototype, 'toolbarItems', function (this: TextEditor, items: ItemList<Mithril.Children>) {
     items.add(
       'cipher',
       <Button
@@ -126,7 +137,10 @@ app.initializers.add('lcoy-cipher', () => {
         icon="fas fa-lock"
         title={String(app.translator.trans('lcoy-cipher.forum.insert_protected'))}
         onclick={() => {
-          const editor = this.attrs.composer?.editor;
+          // The composer hands itself to the editor through attrs (see
+          // TextEditor's docs); the loose ComponentAttrs type doesn't
+          // declare it, so assert the structural shape we rely on.
+          const editor = (this.attrs as { composer?: { editor?: EditorDriverLike } }).composer?.editor;
 
           // The composer may not be attached yet (e.g. quick reply collapsed).
           if (!editor) return;
@@ -152,11 +166,11 @@ app.initializers.add('lcoy-cipher', () => {
 
             if (existing) {
               // Replace the whole existing tag, keeping its position.
-              editor.insertBetween(start, end, bbcode, true);
+              editor.insertBetween(start, end, bbcode);
               editor.moveCursorTo(start + bbcode.length - CLOSING_TAG.length);
             } else {
               const content = selected || placeholder;
-              editor.insertBetween(start, end, `${openTag}${content}${CLOSING_TAG}`, false);
+              editor.insertBetween(start, end, `${openTag}${content}${CLOSING_TAG}`);
               editor.moveCursorTo(start + openTag.length);
             }
           };

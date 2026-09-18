@@ -134,9 +134,7 @@ export default class ProtectedInsertModal extends FormModal<IProtectedInsertModa
             bidi={this.password}
             placeholder={String(
               app.translator.trans(
-                this.attrs.existing && this.existingHash
-                  ? 'lcoy-cipher.forum.password_keep_hint'
-                  : 'lcoy-cipher.forum.password_optional_hint'
+                this.attrs.existing && this.existingHash ? 'lcoy-cipher.forum.password_keep_hint' : 'lcoy-cipher.forum.password_optional_hint'
               )
             )}
           />
@@ -152,11 +150,7 @@ export default class ProtectedInsertModal extends FormModal<IProtectedInsertModa
 
           <div className="Cipher-insert-conditions">
             {conditions.map((condition) => (
-              <Checkbox
-                key={condition.key}
-                state={condition.stream()}
-                onchange={(checked: boolean) => condition.stream(checked)}
-              >
+              <Checkbox key={condition.key} state={condition.stream()} onchange={(checked: boolean) => condition.stream(checked)}>
                 {app.translator.trans(condition.label)}
               </Checkbox>
             ))}

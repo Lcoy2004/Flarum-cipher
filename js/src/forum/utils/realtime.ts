@@ -24,7 +24,7 @@ export async function fetchPostStatus(postId: number): Promise<CipherBlockStatus
     errorHandler: () => {},
   });
 
-  return response?.success ? response.blocks ?? [] : [];
+  return response?.success ? (response.blocks ?? []) : [];
 }
 
 /**
