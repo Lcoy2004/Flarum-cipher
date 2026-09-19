@@ -55,6 +55,24 @@
     font-weight: 600;
   }
 
+  // Blocks with no password of their own spell out the (public) default so
+  // readers don't have to ask.
+  .Cipher-box-default-password {
+    display: flex;
+    align-items: baseline;
+    gap: 0.35rem;
+    padding: 0.25rem 0.6rem;
+    border-radius: var(--border-radius);
+    background: var(--body-bg);
+    font-size: 0.85rem;
+
+    code {
+      font-weight: 600;
+      color: var(--text-color);
+      word-break: break-all;
+    }
+  }
+
   .Cipher-unlock-button {
     min-width: 8rem;
   }
@@ -121,6 +139,14 @@
 .CipherUnlockModal-error {
   margin-bottom: 1rem;
   color: var(--danger-color);
+}
+
+// Notice shown when the default password has been pre-filled: tells the reader
+// there is nothing left to type, just confirm.
+.CipherUnlockModal-defaulthint {
+  margin-bottom: 0.75rem;
+  font-size: 0.85rem;
+  color: var(--muted-color);
 }
 
 // Submit button: centered with a comfortable width instead of the full-width
@@ -234,6 +260,19 @@
   // prevents our rows from stretching — force them to fill the modal width.
   .Form-group {
     width: 100%;
+  }
+
+  // "Use the default password" opt-in shown when editing a block that already
+  // carries a password.
+  .Cipher-insert-use-default {
+    margin-top: 0.4rem;
+  }
+
+  // Read-out of the password a block with an empty field actually uses.
+  .Cipher-insert-password-hint {
+    margin-top: 0.4rem;
+    font-size: 0.8rem;
+    color: var(--muted-color);
   }
 
   .Cipher-insert-conditions {

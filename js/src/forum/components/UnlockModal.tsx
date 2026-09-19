@@ -16,6 +16,13 @@ export interface IUnlockModalAttrs extends IFormModalAttrs {
   postId: number;
   cipherId: string;
   requirements?: CipherRequirement[];
+  /**
+   * The site-wide default password, passed in only for blocks that have no
+   * password of their own (read from the locked card's data attribute). The
+   * card spells the same value out, so the modal pre-fills it instead of
+   * making the reader retype what they can already see.
+   */
+  defaultPassword?: string | null;
 }
 
 export default class UnlockModal extends FormModal<IUnlockModalAttrs> {
@@ -24,6 +31,13 @@ export default class UnlockModal extends FormModal<IUnlockModalAttrs> {
 
   oncreate(vnode: Mithril.VnodeDOM<IUnlockModalAttrs>) {
     super.oncreate(vnode);
+
+    // Blocks that rely on the (public) default password start pre-filled; the
+    // reader still has to confirm, but no longer has to retype the value the
+    // card just showed them. Blocks with their own password start empty.
+    if (this.attrs.defaultPassword) {
+      this.password(this.attrs.defaultPassword);
+    }
 
     // The requirements passed in are the snapshot the server rendered when
     // the page was drawn. If the visitor liked/replied/followed just now, the
@@ -74,6 +88,9 @@ export default class UnlockModal extends FormModal<IUnlockModalAttrs> {
         ) : (
           <p>{app.translator.trans('lcoy-cipher.forum.unlock_modal_hint')}</p>
         )}
+        {this.attrs.defaultPassword && this.password() === this.attrs.defaultPassword && (
+          <p className="CipherUnlockModal-defaulthint">{app.translator.trans('lcoy-cipher.forum.unlock_default_filled')}</p>
+        )}
         <div className="Form-group">
           <input
             className="FormControl"
@@ -98,7 +115,11 @@ export default class UnlockModal extends FormModal<IUnlockModalAttrs> {
   onsubmit(e: SubmitEvent) {
     e.preventDefault();
 
-    if (!this.password()) {
+    // Mirror the insert modal's trimming: a trailing space typed by accident
+    // (mobile keyboards) must not turn a correct password into a wrong one.
+    const password = this.password().trim();
+
+    if (!password) {
       this.error = String(app.translator.trans('lcoy-cipher.forum.password_required'));
       m.redraw();
       return;
@@ -108,7 +129,7 @@ export default class UnlockModal extends FormModal<IUnlockModalAttrs> {
     this.error = '';
     m.redraw();
 
-    unlockBlock(this.attrs.postId, this.attrs.cipherId, this.password())
+    unlockBlock(this.attrs.postId, this.attrs.cipherId, password)
       .then(() => this.hide())
       .catch((err: RequestError) => {
         // Prefer the message returned by the server (wrong password, unmet

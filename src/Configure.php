@@ -27,6 +27,7 @@ class Configure
         // undefined parameter. The PHP render hook overwrites them per request.
         $config->rendering->parameters['CIPHER_LOCKED_TEXT'] = '';
         $config->rendering->parameters['CIPHER_UNLOCK'] = '';
+        $config->rendering->parameters['CIPHER_DEFAULT_PASSWORD_LABEL'] = '';
 
         // At parse time: one-way hash the password attribute and assign a
         // unique id used by the unlock flow.
@@ -95,6 +96,9 @@ class Configure
 				</xsl:if>
 				<div class="Cipher-box-icon"><i class="fas fa-lock" aria-hidden="true"></i></div>
 				<div class="Cipher-box-text"><xsl:value-of select="$CIPHER_LOCKED_TEXT"/></div>
+				<xsl:if test="@data-cipher-default-password">
+					<div class="Cipher-box-default-password"><xsl:value-of select="$CIPHER_DEFAULT_PASSWORD_LABEL"/><code><xsl:value-of select="@data-cipher-default-password"/></code></div>
+				</xsl:if>
 				<div class="Cipher-box-reqs">
 				<xsl:if test="@data-cipher-msg-time">
 					<div class="Cipher-box-req Cipher-box-req--time"><xsl:choose><xsl:when test="@data-cipher-req-time=\'1\'"><i class="fas fa-check Cipher-req-icon Cipher-req-icon--met" aria-hidden="true"></i></xsl:when><xsl:otherwise><i class="fas fa-times Cipher-req-icon Cipher-req-icon--unmet" aria-hidden="true"></i></xsl:otherwise></xsl:choose><span><xsl:value-of select="@data-cipher-msg-time"/></span></div>

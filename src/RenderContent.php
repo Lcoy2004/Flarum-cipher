@@ -14,6 +14,7 @@ namespace Lcoy\Cipher;
 use Flarum\Http\RequestUtil;
 use Flarum\Locale\TranslatorInterface;
 use Flarum\Post\Post;
+use Flarum\Settings\SettingsRepositoryInterface;
 use Flarum\User\User;
 use Psr\Http\Message\ServerRequestInterface;
 use s9e\TextFormatter\Renderer;
@@ -23,7 +24,8 @@ class RenderContent
     public function __construct(
         protected TranslatorInterface $translator,
         protected Conditions $conditions,
-        protected RequirementStatus $requirements
+        protected RequirementStatus $requirements,
+        protected SettingsRepositoryInterface $settings
     ) {
     }
 
@@ -49,6 +51,7 @@ class RenderContent
 
         $renderer->setParameter('CIPHER_LOCKED_TEXT', $this->translator->trans('lcoy-cipher.forum.locked_text'));
         $renderer->setParameter('CIPHER_UNLOCK', $this->translator->trans('lcoy-cipher.forum.unlock'));
+        $renderer->setParameter('CIPHER_DEFAULT_PASSWORD_LABEL', $this->translator->trans('lcoy-cipher.forum.card_default_password_label'));
 
         $actor = $request ? RequestUtil::getActor($request) : null;
 
@@ -129,6 +132,15 @@ class RenderContent
             // the frontend can schedule a one-shot refresh instead of polling.
             if ($target !== null) {
                 $node->setAttribute('data-cipher-target', (string) $target);
+            }
+
+            // A block with no password of its own is unlocked with the default
+            // password, which is public — the card spells it out so readers
+            // don't have to ask. That also means such a block is only as
+            // private as the default itself; authors set their own password
+            // when they need real protection (those hashes are never shown).
+            if (($attrs['password'] ?? '') === '') {
+                $node->setAttribute('data-cipher-default-password', ProtectedFilter::defaultPassword($this->settings));
             }
 
             // Strip the inner content.

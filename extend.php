@@ -38,7 +38,10 @@ return [
         ->post('/resource/unlock', 'cipher.unlock', Api\Controller\UnlockController::class)
         // GET /api/cipher/status?postId=N — current condition status of every
         // protected block in a post, used for real-time checklist refreshes.
-        ->get('/cipher/status', 'cipher.status', Api\Controller\StatusController::class),
+        ->get('/cipher/status', 'cipher.status', Api\Controller\StatusController::class)
+        // GET /api/cipher/default-password — the effective password for blocks
+        // whose author set none, for authors who forgot it (permission-gated).
+        ->get('/cipher/default-password', 'cipher.defaultPassword', Api\Controller\DefaultPasswordController::class),
 
     // Real-time updates: broadcast a lightweight event when a minlikes-gated
     // post is liked, so visitors see the checklist flip without reloading.

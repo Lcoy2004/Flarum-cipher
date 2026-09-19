@@ -11,7 +11,6 @@
 
 namespace Lcoy\Cipher;
 
-use Flarum\Settings\SettingsRepositoryInterface;
 use Flarum\User\User;
 use s9e\TextFormatter\Parser;
 
@@ -43,11 +42,6 @@ class ParseProtected
      */
     protected const PASSWORD = '~(?<![\w-])password(?![\w-])=(?:"([^"]*)"|\'([^\']*)\'|((?:[^\s\]]|[ \t](?!\s*(?:[-\w]+=|/?\))))*))~i';
 
-    public function __construct(
-        protected SettingsRepositoryInterface $settings
-    ) {
-    }
-
     /**
      * Pre-parse callback: replace the plaintext password inside every
      * [protected ...] opening tag with a one-way hash before s9e parses the
@@ -58,8 +52,12 @@ class ParseProtected
      * content nor the unparse markers ever contain the plaintext password.
      * ProtectedFilter runs again at parse time as a safety net.
      *
-     * If the author left the password empty or omitted it, the configured
-     * default password is applied so the block can still be unlocked.
+     * A block whose author left the password empty keeps an explicitly empty
+     * password attribute: it is verified against the *current* default password
+     * at unlock time (see UnlockController). Hashing the default in here
+     * instead would freeze the value into the post, so changing the default in
+     * the admin panel would leave every existing password-less block gated on a
+     * password nobody remembers.
      */
     public function __invoke(Parser $parser, mixed $context, string $text, ?User $user = null): string
     {
@@ -71,11 +69,9 @@ class ParseProtected
             return $text;
         }
 
-        $defaultPassword = ProtectedFilter::defaultPassword($this->settings);
-
         return preg_replace_callback(
             self::TAG_OPEN,
-            function (array $m) use ($defaultPassword): string {
+            function (array $m): string {
                 $attrs = $m[1];
 
                 // Password may be quoted (double or single) or unquoted;
@@ -88,9 +84,11 @@ class ParseProtected
                     $password = $pm[1] ?? $pm[2] ?? $pm[3] ?? '';
 
                     if ($password === '') {
-                        // Author left the password empty → apply the hashed default
-                        // password so it never appears in plaintext anywhere.
-                        $attrs = str_replace($pm[0], 'password="'.password_hash($defaultPassword, PASSWORD_DEFAULT).'"', $attrs);
+                        // Left empty → keep it empty (and normalize the quoting so
+                        // the stored attribute is deterministic). The block stays
+                        // openable with whatever the default password is when
+                        // someone unlocks it.
+                        $attrs = str_replace($pm[0], 'password=""', $attrs);
                     } elseif (! ProtectedFilter::isHashed($password)) {
                         // Don't re-hash values that already look like bcrypt/argon2
                         // hashes (e.g. the raw text reconstructed by unparse() when a
@@ -98,12 +96,12 @@ class ParseProtected
                         $attrs = str_replace($pm[0], 'password="'.password_hash($password, PASSWORD_DEFAULT).'"', $attrs);
                     }
                 } else {
-                    // No password attribute at all → apply the hashed default
-                    // password. rtrim (not trim) keeps the leading space that
-                    // separates the tag name from its attributes — trim() would
-                    // produce "[protectedlike=...]", which s9e can't parse and
-                    // would leak the content as plain text.
-                    $attrs = rtrim($attrs).' password="'.password_hash($defaultPassword, PASSWORD_DEFAULT).'"';
+                    // No password attribute at all → record it as empty, which the
+                    // unlock flow resolves against the default password. rtrim (not
+                    // trim) keeps the leading space that separates the tag name from
+                    // its attributes — trim() would produce "[protectedlike=...]",
+                    // which s9e can't parse and would leak the content as plain text.
+                    $attrs = rtrim($attrs).' password=""';
                 }
 
                 return '[protected'.$attrs.']';

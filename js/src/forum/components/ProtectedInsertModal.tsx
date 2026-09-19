@@ -5,6 +5,7 @@ import Checkbox from 'flarum/common/components/Checkbox';
 import Select from 'flarum/common/components/Select';
 import Stream from 'flarum/common/utils/Stream';
 import type Mithril from 'mithril';
+import { fetchDefaultPassword } from '../utils/unlock';
 
 // Note: `m` is intentionally not imported — Flarum 2.x patches the global
 // `window.m` (via patchMithril) to support the `bidi` attribute. Importing
@@ -98,6 +99,15 @@ export default class ProtectedInsertModal extends FormModal<IProtectedInsertModa
   // instead of falling back to the default password.
   protected existingHash: string | null = null;
 
+  // Editing a block that carries a hash: the author opted to drop it and fall
+  // back to the default password instead. Without this there is no way out of
+  // `existingHash` — clearing the field alone keeps the old password.
+  protected useDefaultPassword = Stream(false);
+
+  // The site-wide default password, so the author can see what an empty field
+  // resolves to instead of having to remember it. null until fetched.
+  protected defaultPassword: string | null = null;
+
   protected error = '';
 
   oncreate(vnode: Mithril.VnodeDOM<IProtectedInsertModalAttrs, this>) {
@@ -106,6 +116,16 @@ export default class ProtectedInsertModal extends FormModal<IProtectedInsertModa
     if (this.attrs.existing) {
       this.populateFromExisting(this.attrs.existing);
     }
+
+    // A password the author typed can never be shown again (it is stored as a
+    // bcrypt hash), so surface the default instead — it is what a block with an
+    // empty password actually uses.
+    fetchDefaultPassword().then((password) => {
+      if (password !== null) {
+        this.defaultPassword = password;
+        m.redraw();
+      }
+    });
   }
 
   className() {
@@ -132,12 +152,46 @@ export default class ProtectedInsertModal extends FormModal<IProtectedInsertModa
             className="FormControl Cipher-insert-password"
             type="text"
             bidi={this.password}
+            disabled={!!(this.attrs.existing && this.existingHash && this.useDefaultPassword())}
             placeholder={String(
               app.translator.trans(
-                this.attrs.existing && this.existingHash ? 'lcoy-cipher.forum.password_keep_hint' : 'lcoy-cipher.forum.password_optional_hint'
+                this.attrs.existing && this.existingHash
+                  ? this.useDefaultPassword()
+                    ? 'lcoy-cipher.forum.password_using_default_hint'
+                    : 'lcoy-cipher.forum.password_keep_hint'
+                  : 'lcoy-cipher.forum.password_optional_hint'
               )
             )}
           />
+
+          {/* Tells the author what an empty password field resolves to, or —
+              while a stored password is kept — that it can no longer be
+              displayed, with a pointer to the two ways out. */}
+          {this.defaultPassword !== null && (
+            <div className="Cipher-insert-password-hint">
+              {this.existingHash && !this.useDefaultPassword()
+                ? app.translator.trans('lcoy-cipher.forum.password_stored_hint')
+                : app.translator.trans('lcoy-cipher.forum.password_default_hint', { password: this.defaultPassword })}
+            </div>
+          )}
+
+          {/* Only meaningful for blocks that carry a stored password: a freshly
+              inserted block with an empty field already uses the default. */}
+          {this.attrs.existing && this.existingHash && (
+            <Checkbox
+              className="Cipher-insert-use-default"
+              state={this.useDefaultPassword()}
+              onchange={(checked: boolean) => {
+                this.useDefaultPassword(checked);
+
+                // The checkbox is authoritative: drop whatever was typed so a
+                // stray value can't silently override the choice.
+                if (checked) this.password('');
+              }}
+            >
+              {app.translator.trans('lcoy-cipher.forum.password_use_default')}
+            </Checkbox>
+          )}
         </div>
 
         <div className="Form-group">
@@ -195,11 +249,27 @@ export default class ProtectedInsertModal extends FormModal<IProtectedInsertModa
   onsubmit(e: SubmitEvent) {
     e.preventDefault();
 
+    // Drop any error from a previous attempt before re-validating, so a fixed
+    // input doesn't keep showing a stale message.
+    this.error = '';
+
+    const entered = this.password().trim();
+
     // A bare `"` inside the BBCode attribute would break the tag open (s9e
     // parses it as plain text), silently turning the protected content into
     // visible source code — reject it up front instead.
-    if (this.password().includes('"')) {
+    if (entered.includes('"')) {
       this.error = String(app.translator.trans('lcoy-cipher.forum.password_invalid_quote'));
+      m.redraw();
+      return;
+    }
+
+    // A value that looks like a bcrypt/argon2 hash would be stored as-is (the
+    // hash-passthrough path exists for hashes the server itself produced when
+    // a post is edited) and could then never be matched by anything a reader
+    // types — reject it instead of creating a block nobody can unlock.
+    if (HASH_RE.test(entered)) {
+      this.error = String(app.translator.trans('lcoy-cipher.forum.password_invalid_hash'));
       m.redraw();
       return;
     }
@@ -297,9 +367,18 @@ export default class ProtectedInsertModal extends FormModal<IProtectedInsertModa
   protected buildBBCode(): string {
     const attrs: string[] = [];
 
-    const entered = this.password();
+    // Trim so an accidental leading/trailing space (mobile keyboards love
+    // adding one) doesn't silently become part of the password — the unlock
+    // modal trims its input the same way, so whatever the author meant to set
+    // is exactly what a reader typing it will unlock with.
+    const entered = this.password().trim();
 
-    if (entered) {
+    // The explicit "use the default password" choice wins over anything typed:
+    // the input is disabled while it is ticked, but keep the order defensive so
+    // a stray value can never silently override the author's choice.
+    if (this.existingHash && this.useDefaultPassword()) {
+      attrs.push('password=""');
+    } else if (entered) {
       // A bare `"` would break the attribute open (s9e parses the rest as
       // plain text), silently exposing the protected content. onsubmit already
       // rejects it; the replacement is a safety net for other paths.
@@ -308,7 +387,8 @@ export default class ProtectedInsertModal extends FormModal<IProtectedInsertModa
       // Editing a stored tag: an empty password keeps the existing hash.
       attrs.push(`password="${this.existingHash}"`);
     } else {
-      // New block without a password → the server applies the default.
+      // No password: the server stores an explicitly empty value, and the
+      // unlock flow checks it against the current default password.
       attrs.push('password=""');
     }
 

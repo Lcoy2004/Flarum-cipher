@@ -55,7 +55,11 @@ class UnlockController implements RequestHandlerInterface
 
         $postId = (int) ($body['postId'] ?? 0);
         $cipherId = (string) ($body['bbcodeIndex'] ?? '');
-        $password = (string) ($body['password'] ?? '');
+
+        // Trim, mirroring the insert modal: an accidental trailing space
+        // (mobile keyboards) must not turn a correct password into a wrong
+        // one. Both sides trim, so edge whitespace is never part of a password.
+        $password = trim((string) ($body['password'] ?? ''));
 
         if ($postId <= 0 || $cipherId === '' || $password === '') {
             return $this->error(400, $this->translator->trans('lcoy-cipher.forum.invalid_request'));

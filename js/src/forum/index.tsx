@@ -122,7 +122,14 @@ app.initializers.add('lcoy-cipher', () => {
     const cipherId = box.dataset.cipherId;
 
     if (postId != null && cipherId) {
-      app.modal.show(UnlockModal, { postId, cipherId, requirements: boxRequirements(box) });
+      app.modal.show(UnlockModal, {
+        postId,
+        cipherId,
+        requirements: boxRequirements(box),
+        // Present only on blocks with no password of their own — the card
+        // displays the same value right next to the button.
+        defaultPassword: box.getAttribute('data-cipher-default-password'),
+      });
     }
   });
 

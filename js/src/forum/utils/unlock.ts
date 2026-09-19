@@ -39,6 +39,34 @@ export function savedPassword(postId: number, cipherId: string): string | null {
   return sessionStorage.getItem(sessionKey(postId, cipherId));
 }
 
+interface DefaultPasswordResponse {
+  success: boolean;
+  password?: string;
+}
+
+/**
+ * The default password — what unlocks every block whose author set no password
+ * of its own — or null if it couldn't be fetched.
+ *
+ * Shown to anyone: it is a forum-wide fallback that authors otherwise have no
+ * way to look up, and a block that relies on it is only as private as the
+ * default itself. A password set by an individual author is a bcrypt hash and
+ * is never returned by the server.
+ */
+export async function fetchDefaultPassword(): Promise<string | null> {
+  try {
+    const response = await app.request<DefaultPasswordResponse>({
+      method: 'GET',
+      url: `${app.forum.attribute('apiUrl')}/cipher/default-password`,
+      errorHandler: () => {},
+    });
+
+    return response?.success ? (response.password ?? null) : null;
+  } catch {
+    return null;
+  }
+}
+
 /**
  * Ask the server to verify the password and swap the locked card for the
  * rendered content — no page reload required. The returned HTML is produced by

@@ -2,6 +2,7 @@ lcoy-cipher:
   forum:
     unlock: 解锁
     locked_text: 此内容受密码保护
+    card_default_password_label: 默认密码：
     insert_protected: 插入受保护内容
     placeholder_content: 在此输入受保护的内容
     unlock_modal_title: 解锁受保护内容
@@ -10,8 +11,14 @@ lcoy-cipher:
     password_optional_label: 密码（可选）
     password_optional_hint: 可留空，留空则使用默认密码
     password_keep_hint: 已设置密码，留空保持不变
+    password_use_default: 改用默认密码（清除已设置的密码）
+    password_default_hint: 默认密码：{password}（密码留空时使用）
+    password_stored_hint: 已单独设置密码，无法显示。可输入新密码覆盖，或勾选下方「改用默认密码」
+    password_using_default_hint: 将使用默认密码
     password_invalid_quote: 密码不能包含双引号
-    password_unlock_hint: 请输入密码（作者留空时使用默认密码）
+    password_invalid_hash: 密码不能以 $2y$ 或 $argon2 开头（保留的哈希格式，会导致无法解锁）
+    password_unlock_hint: 请输入密码
+    unlock_default_filled: 已填入默认密码，点击「确认解锁」即可查看
     password_required: 请输入密码后再解锁。
     submit: 确认解锁
     wrong_password: 密码错误，请重试。
@@ -60,4 +67,4 @@ lcoy-cipher:
       allow_guest_unlock: 允许访客解锁受保护内容
       allow_guest_unlock_help: 关闭后，只有登录用户才能通过密码解锁受保护内容。
       default_password: 默认密码
-      default_password_help: 作者未设置密码时使用该默认密码。请提醒作者将默认密码告知访客，或自行在内容中说明。
+      default_password_help: 作者未设置密码时使用该默认密码。该密码会在编辑弹窗中对所有用户显示，便于作者查看，因此留空密码的内容仅相当于「点开即可见」；需要真正保密的内容请单独设置密码。修改后对所有「未单独设置密码」的受保护内容立即生效。
