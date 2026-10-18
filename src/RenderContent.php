@@ -66,8 +66,16 @@ class RenderContent
         $post = $context instanceof Post ? $context : null;
 
         if ($post !== null && ! $allowed) {
+            $discussion = $post->discussion;
+
+            // "Moderates this discussion" is the ability core's own post
+            // visibility scoping asks for (ScopePostVisibility), so per-tag
+            // grants count as well as the global discussion.hidePosts
+            // permission. Flarum defines no `discussion.moderate` permission
+            // (the string checked here before), so no non-admin moderator ever
+            // matched it.
             $allowed = (int) $post->user_id === (int) $actor->id
-                || $actor->hasPermission('discussion.moderate');
+                || ($discussion !== null && $actor->can('hidePosts', $discussion));
         }
 
         if ($allowed) {

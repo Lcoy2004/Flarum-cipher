@@ -33,10 +33,34 @@ function sessionKey(postId: number, cipherId: string): string {
 }
 
 /**
+ * Storage access is best-effort: browsers that block storage (private modes,
+ * blocked cookies) throw on every access, and Flarum 2.0.1 guards its own
+ * sessionStorage reads and writes the same way. An unguarded read would abort
+ * the whole auto-unlock pass, and an unguarded write would fail an unlock that
+ * actually succeeded and leave the content hidden behind a locked card.
+ */
+function readSession(key: string): string | null {
+  try {
+    return sessionStorage.getItem(key);
+  } catch {
+    return null;
+  }
+}
+
+function writeSession(key: string, value: string): void {
+  try {
+    sessionStorage.setItem(key, value);
+  } catch {
+    // Storage is unavailable: the password simply isn't remembered for the
+    // rest of the session.
+  }
+}
+
+/**
  * The password remembered for a block, if any (current session only).
  */
 export function savedPassword(postId: number, cipherId: string): string | null {
-  return sessionStorage.getItem(sessionKey(postId, cipherId));
+  return readSession(sessionKey(postId, cipherId));
 }
 
 interface DefaultPasswordResponse {
@@ -81,7 +105,7 @@ export async function unlockBlock(postId: number, cipherId: string, password: st
     errorHandler: () => {},
   });
 
-  sessionStorage.setItem(sessionKey(postId, cipherId), password);
+  writeSession(sessionKey(postId, cipherId), password);
 
   const box = document.querySelector<HTMLElement>(`.Cipher-box-locked[data-cipher-id="${cipherId}"]`);
 
