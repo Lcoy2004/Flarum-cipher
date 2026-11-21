@@ -51,9 +51,10 @@ class PushPostUpdate
 
         $post = $event->post;
 
-        // `content` is the stored (parsed) XML, so the thresholds are read
-        // without loading or rendering the post.
-        $content = $post->content;
+        // `content` is the unparsed BBCode for editing; the stored XML lives
+        // behind getParsedContentAttribute(), and that is what carries the
+        // <PROTECTED> tags, so thresholds are read without rendering the post.
+        $content = $post->getParsedContentAttribute();
 
         if (! is_string($content) || ! str_contains($content, '<PROTECTED')) {
             return;

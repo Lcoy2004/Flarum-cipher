@@ -70,7 +70,12 @@ class RenderContent
             // signed-in non-author can hold a moderation grant, so guests skip
             // the discussion relation load entirely — otherwise every post in a
             // stream without that relation eager-loaded costs one query.
-            $allowed = (int) $post->user_id === (int) $actor->id;
+            // Guests carry id 0 and a deleted author leaves user_id NULL, so
+            // both must be excluded: `(int) null === (int) 0` would otherwise
+            // hand a guest the content of an orphaned post.
+            $allowed = ! $actor->isGuest()
+                && $post->user_id !== null
+                && (int) $post->user_id === (int) $actor->id;
 
             if (! $allowed && ! $actor->isGuest()) {
                 $discussion = $post->discussion;

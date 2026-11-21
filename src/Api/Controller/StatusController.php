@@ -110,7 +110,12 @@ class StatusController implements RequestHandlerInterface
     protected function blocksFor(CommentPost $post, string $xml, ?User $actor, ServerRequestInterface $request, bool $uncached): array
     {
         if (! $uncached && $actor?->isGuest()) {
-            return $this->cache->remember('lcoy-cipher.status.'.$post->id.'.guest', self::CACHE_TTL_SECONDS, fn () => $this->computeBlocks($post, $xml, $actor, $request));
+            // The checklist messages are translated per request locale, so the
+            // key has to carry it — otherwise guests with different languages
+            // share one entry and read the wrong translations.
+            $key = 'lcoy-cipher.status.'.$post->id.'.guest.'.$this->translator->getLocale();
+
+            return $this->cache->remember($key, self::CACHE_TTL_SECONDS, fn () => $this->computeBlocks($post, $xml, $actor, $request));
         }
 
         return $this->computeBlocks($post, $xml, $actor, $request);
