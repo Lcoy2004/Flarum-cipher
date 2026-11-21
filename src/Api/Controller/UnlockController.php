@@ -124,10 +124,12 @@ class UnlockController implements RequestHandlerInterface
         }
 
         // Even with the correct password, visibility conditions must be met.
-        $unmet = $this->conditions->unmet($block, $post, $actor);
+        // Only the first failure is reported, so stop at it: a block gated on a
+        // future date or a missing like never runs the reply/follow queries.
+        $unmet = $this->conditions->firstUnmet($block, $post, $actor);
 
-        if ($unmet !== []) {
-            return $this->error(403, $this->unlockRequirementMessage($unmet[0], $block));
+        if ($unmet !== null) {
+            return $this->error(403, $this->unlockRequirementMessage($unmet, $block));
         }
 
         $this->cache->forget($attemptKey);

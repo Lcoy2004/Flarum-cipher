@@ -7,7 +7,6 @@ import type Mithril from 'mithril';
 
 export { default as extend } from './extend';
 
-import UnlockModal from './components/UnlockModal';
 import ProtectedInsertModal from './components/ProtectedInsertModal';
 import { attemptAutoUnlock } from './utils/autoUnlock';
 import { getPostId } from './utils/unlock';
@@ -122,14 +121,23 @@ app.initializers.add('lcoy-cipher', () => {
     const cipherId = box.dataset.cipherId;
 
     if (postId != null && cipherId) {
-      app.modal.show(UnlockModal, {
-        postId,
-        cipherId,
-        requirements: boxRequirements(box),
-        // Present only on blocks with no password of their own — the card
-        // displays the same value right next to the button.
-        defaultPassword: box.getAttribute('data-cipher-default-password'),
-      });
+      // The modal is only needed once a locked card is clicked, so it is
+      // imported as an async chunk instead of being part of the bundle every
+      // visitor downloads. Flarum's registry loads it on demand (and shows its
+      // own error if the chunk cannot be fetched), so failures are swallowed
+      // here rather than surfacing as an unhandled rejection.
+      import('./components/UnlockModal')
+        .then(({ default: UnlockModal }) => {
+          app.modal.show(UnlockModal, {
+            postId,
+            cipherId,
+            requirements: boxRequirements(box),
+            // Present only on blocks with no password of their own — the card
+            // displays the same value right next to the button.
+            defaultPassword: box.getAttribute('data-cipher-default-password'),
+          });
+        })
+        .catch(() => {});
     }
   });
 

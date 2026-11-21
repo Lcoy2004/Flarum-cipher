@@ -68,6 +68,32 @@ export function applyBlockStatus(block: CipherBlockStatus): void {
 }
 
 /**
+ * Short-lived verdict cache for the unlock modal.
+ *
+ * Opening the modal fetches the checklist, and closing/reopening it a moment
+ * later would ask the same question again. Nothing inside the modal can change
+ * a condition (the password is checked server-side), so a verdict reused for
+ * half a minute is safe; event-driven refreshes and page loads bypass this
+ * cache entirely.
+ */
+const MODAL_STATUS_TTL_MS = 30_000;
+const modalStatusCache = new Map<number, { at: number; blocks: CipherBlockStatus[] }>();
+
+export function fetchPostStatusForModal(postId: number): Promise<CipherBlockStatus[]> {
+  const cached = modalStatusCache.get(postId);
+
+  if (cached && Date.now() - cached.at < MODAL_STATUS_TTL_MS) {
+    return Promise.resolve(cached.blocks);
+  }
+
+  return fetchPostStatus(postId).then((blocks) => {
+    modalStatusCache.set(postId, { at: Date.now(), blocks });
+
+    return blocks;
+  });
+}
+
+/**
  * Refresh the locked-card checklists of a post from the status API.
  *
  * If any block reports that its `time` gate has been reached (html present),
@@ -139,6 +165,10 @@ function scheduleRefresh(postId: number): void {
 const PUSHER_MAX_WAIT_MS = 5000;
 const PUSHER_POLL_INTERVAL_MS = 250;
 
+// Set once the socket handler is in place, so a second bind can't stack a
+// duplicate listener.
+let channelBound = false;
+
 export function setupRealtimeUpdates(): void {
   waitForPusher(Date.now() + PUSHER_MAX_WAIT_MS);
 }
@@ -159,15 +189,27 @@ function waitForPusher(deadline: number): void {
 }
 
 function bindCipherChannel(pusher: Promise<any>): void {
-  pusher.then((binding: any) => {
-    if (!binding?.pusher?.bind) return;
+  pusher
+    .then((binding: any) => {
+      if (!binding?.pusher?.bind) return;
 
-    binding.pusher.bind('cipherPostUpdate', (data: { postId?: number }) => {
-      if (typeof data?.postId === 'number') {
-        scheduleRefresh(data.postId);
-      }
+      // One handler per page lifetime. The initializer runs once, but a second
+      // bind (a re-run, or another copy of this call) would make every event
+      // refresh the post twice.
+      if (channelBound) return;
+
+      channelBound = true;
+
+      binding.pusher.bind('cipherPostUpdate', (data: { postId?: number }) => {
+        if (typeof data?.postId === 'number') {
+          scheduleRefresh(data.postId);
+        }
+      });
+    })
+    .catch(() => {
+      // The socket never came up; time-gated blocks still work through their
+      // own one-shot timers.
     });
-  });
 }
 
 /**

@@ -9,7 +9,7 @@ node_modules/
 # directly through extend.php after a plain `composer require`. Build tooling
 # isn't required downstream, so the compiled artefacts must ship with each
 # release. Source-maps can stay out since they're only needed for debugging.
-js/dist/*.map
+js/dist/**/*.map
 
 # IDE / OS
 .idea/

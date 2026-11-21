@@ -66,16 +66,23 @@ class RenderContent
         $post = $context instanceof Post ? $context : null;
 
         if ($post !== null && ! $allowed) {
-            $discussion = $post->discussion;
+            // The author check reads a column already in memory. Only a
+            // signed-in non-author can hold a moderation grant, so guests skip
+            // the discussion relation load entirely — otherwise every post in a
+            // stream without that relation eager-loaded costs one query.
+            $allowed = (int) $post->user_id === (int) $actor->id;
 
-            // "Moderates this discussion" is the ability core's own post
-            // visibility scoping asks for (ScopePostVisibility), so per-tag
-            // grants count as well as the global discussion.hidePosts
-            // permission. Flarum defines no `discussion.moderate` permission
-            // (the string checked here before), so no non-admin moderator ever
-            // matched it.
-            $allowed = (int) $post->user_id === (int) $actor->id
-                || ($discussion !== null && $actor->can('hidePosts', $discussion));
+            if (! $allowed && ! $actor->isGuest()) {
+                $discussion = $post->discussion;
+
+                // "Moderates this discussion" is the ability core's own post
+                // visibility scoping asks for (ScopePostVisibility), so per-tag
+                // grants count as well as the global discussion.hidePosts
+                // permission. Flarum defines no `discussion.moderate` permission
+                // (the string checked here before), so no non-admin moderator ever
+                // matched it.
+                $allowed = $discussion !== null && $actor->can('hidePosts', $discussion);
+            }
         }
 
         if ($allowed) {
@@ -100,8 +107,12 @@ class RenderContent
             $title = $attrs['title'] ?? null;
 
             // Scheduled visibility: once the time is reached the block is
-            // visible to everyone, no password required.
-            $target = $post !== null && $actor !== null ? $this->conditions->timeTarget($attrs) : null;
+            // visible to everyone, no password required. The timestamp is
+            // absolute by now (ProtectedFilter normalises it at parse time), so
+            // the gate can be decided without a request context too — a
+            // notification email that renders the post must not show a card for
+            // content that has already become public.
+            $target = $this->conditions->timeTarget($attrs);
 
             if ($target !== null && time() >= $target) {
                 continue;

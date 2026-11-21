@@ -62,6 +62,13 @@ class Conditions
      */
     protected array $timeMemo = [];
 
+    /**
+     * Request-scoped like aggregates, keyed by post + actor.
+     *
+     * @var array<string, array{count: int, liked: bool}>
+     */
+    protected array $likeStatsMemo = [];
+
     protected function remember(string $key, callable $callback): bool|int
     {
         if (! array_key_exists($key, $this->memo)) {
@@ -131,6 +138,41 @@ class Conditions
     }
 
     /**
+     * The post's total like count and whether the actor is among the likers.
+     *
+     * `like` (has the actor liked it?) and `minlikes` (has the post reached N
+     * likes?) read the same table, so one aggregate answers both instead of two
+     * queries per block. Guests are counted in the total but can never be a
+     * liker.
+     *
+     * @return array{count: int, liked: bool}
+     */
+    public function likeStats(Post $post, User $actor): array
+    {
+        if (! $this->hasLikesTable()) {
+            return ['count' => 0, 'liked' => false];
+        }
+
+        $key = $post->id.'.'.$actor->id;
+
+        if (isset($this->likeStatsMemo[$key])) {
+            return $this->likeStatsMemo[$key];
+        }
+
+        // post_likes is keyed by (post_id, user_id), so this is one index range
+        // scan: the aggregate never needs a second pass over the rows.
+        $row = $this->db->table('post_likes')
+            ->where('post_id', $post->id)
+            ->selectRaw('COUNT(*) AS total, SUM(CASE WHEN user_id = ? THEN 1 ELSE 0 END) AS mine', [(int) $actor->id])
+            ->first();
+
+        return $this->likeStatsMemo[$key] = [
+            'count' => (int) ($row->total ?? 0),
+            'liked' => ! $actor->isGuest() && (int) ($row->mine ?? 0) > 0,
+        ];
+    }
+
+    /**
      * @return bool whether the actor has liked the post
      *
      * Guests cannot like posts, so skip the query entirely for them.
@@ -141,10 +183,7 @@ class Conditions
             return false;
         }
 
-        return $this->remember('like.'.$post->id.'.'.$actor->id, fn () => $this->db->table('post_likes')
-            ->where('post_id', $post->id)
-            ->where('user_id', $actor->id)
-            ->exists());
+        return $this->likeStats($post, $actor)['liked'];
     }
 
     /**
@@ -209,17 +248,66 @@ class Conditions
     /**
      * @return int total number of likes on the post
      */
-    public function likeCount(Post $post): int
+    public function likeCount(Post $post, User $actor): int
     {
-        if (! $this->hasLikesTable()) {
-            return 0;
+        return $this->likeStats($post, $actor)['count'];
+    }
+
+    /**
+     * Whether each configured condition is satisfied, in evaluation order.
+     *
+     * The order is the short-circuit order: the time gate is a plain comparison
+     * on a pre-parsed timestamp, the actor-scoped relations come next, and the
+     * aggregate like count — the only check that looks at other users' actions
+     * — goes last. The keys double as the labels reported to callers, so
+     * unmet() and firstUnmet() cannot drift apart.
+     *
+     * The checks are lazy: building the map costs nothing, and a caller that
+     * stops early never issues the queries of the conditions it skipped.
+     *
+     * @param  array<string,string> $attrs
+     * @return array<string, callable(): bool>
+     */
+    protected function checks(array $attrs, Post $post, User $actor): array
+    {
+        $checks = [];
+
+        $target = $this->timeTarget($attrs);
+
+        if ($target !== null) {
+            $checks['time'] = static fn (): bool => time() >= $target;
         }
 
-        return $this->remember('likes.'.$post->id, fn () => (int) $this->db->table('post_likes')->where('post_id', $post->id)->count());
+        if ($attrs['like'] ?? '') {
+            $checks['like'] = fn (): bool => $this->isLikedBy($post, $actor);
+        }
+
+        if ($attrs['reply'] ?? '') {
+            $checks['reply'] = fn (): bool => $this->hasReplied($post, $actor);
+        }
+
+        if ($attrs['follow'] ?? '') {
+            $checks['follow'] = fn (): bool => $this->followsAuthor($post, $actor);
+        }
+
+        // s9e lowercases attribute names, so read the discussion-follow flag
+        // with its lowercase key.
+        if ($attrs['followdiscussion'] ?? '') {
+            $checks['followDiscussion'] = fn (): bool => $this->hasFollowedDiscussion($post, $actor);
+        }
+
+        if (($minlikes = (int) ($attrs['minlikes'] ?? 0)) > 0) {
+            $checks['minlikes'] = fn (): bool => $this->likeCount($post, $actor) >= $minlikes;
+        }
+
+        return $checks;
     }
 
     /**
      * The list of condition keys currently not satisfied for this actor.
+     *
+     * Every condition has to be evaluated here: the locked card lists each one
+     * with its own tick, so stopping at the first failure would hide the rest.
      *
      * @param  array<string,string> $attrs
      * @return string[] e.g. ['time', 'like', 'reply', 'follow', 'followDiscussion', 'minlikes']
@@ -228,35 +316,33 @@ class Conditions
     {
         $unmet = [];
 
-        if (($target = $this->timeTarget($attrs)) !== null && time() < $target) {
-            $unmet[] = 'time';
-        }
-
-        if (($attrs['like'] ?? '') && ! $this->isLikedBy($post, $actor)) {
-            $unmet[] = 'like';
-        }
-
-        if (($attrs['reply'] ?? '') && ! $this->hasReplied($post, $actor)) {
-            $unmet[] = 'reply';
-        }
-
-        if (($attrs['follow'] ?? '') && ! $this->followsAuthor($post, $actor)) {
-            $unmet[] = 'follow';
-        }
-
-        // s9e lowercases attribute names, so read the discussion-follow flag
-        // with its lowercase key.
-        if (($attrs['followdiscussion'] ?? '') && ! $this->hasFollowedDiscussion($post, $actor)) {
-            $unmet[] = 'followDiscussion';
-        }
-
-        $minlikes = (int) ($attrs['minlikes'] ?? 0);
-
-        if ($minlikes > 0 && $this->likeCount($post) < $minlikes) {
-            $unmet[] = 'minlikes';
+        foreach ($this->checks($attrs, $post, $actor) as $key => $met) {
+            if (! $met()) {
+                $unmet[] = $key;
+            }
         }
 
         return $unmet;
+    }
+
+    /**
+     * The first condition that fails, or null when all of them are satisfied.
+     *
+     * Callers that only need the verdict (the unlock endpoint) use this instead
+     * of unmet(): a block gated on a future date or a missing like never reaches
+     * the reply/follow queries.
+     *
+     * @param  array<string,string> $attrs
+     */
+    public function firstUnmet(array $attrs, Post $post, User $actor): ?string
+    {
+        foreach ($this->checks($attrs, $post, $actor) as $key => $met) {
+            if (! $met()) {
+                return $key;
+            }
+        }
+
+        return null;
     }
 
     protected function hasFollowersTable(): bool

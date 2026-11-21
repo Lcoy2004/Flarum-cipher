@@ -18,6 +18,10 @@ use Flarum\Likes\Event\PostWasUnliked;
 return [
     (new Extend\Frontend('forum'))
         ->js(__DIR__.'/js/dist/forum.js')
+        // Async chunks (the unlock modal) are emitted next to the entry bundle
+        // under js/dist/forum and must be copied to js/lcoy-cipher/forum so
+        // Flarum's chunk loader can resolve them.
+        ->jsDirectory(__DIR__.'/js/dist/forum')
         ->css(__DIR__.'/resources/less/forum/extension.less'),
 
     (new Extend\Frontend('admin'))
